@@ -1,0 +1,72 @@
+{
+    "tables": {
+        "ingress::in_tbl": {
+            "rules": [
+               {
+                   "name": "v00_to_p0", 
+                   "match": {
+                        "standard_metadata.ingress_port": {
+                            "value": "v0.0"
+                        }
+                    },
+                    "action": {
+                       "type": "ingress::forward",
+                       "data": {
+                            "port": {
+                                "value": "p0"
+                            }
+                        } 
+                    } 
+               }, 
+                {
+                   "name": "p0_to_v00", 
+                   "match": {
+                        "standard_metadata.ingress_port": {
+                            "value": "p0"
+                        }
+                   },
+                   "action": {
+                        "type": "ingress::forward",
+                        "data": {
+                            "port": {
+                                "value": "v0.0"
+                            }
+                        } 
+                    } 
+                },
+                {
+                   "name": "p1_to_v01", 
+                   "match": {
+                        "standard_metadata.ingress_port": {
+                            "value": "p1"
+                        }
+                   },
+                   "action": {
+                        "type": "ingress::forward",
+                        "data": {
+                            "port": {
+                                "value": "v0.1"
+                            }
+                        } 
+                    } 
+                },
+               {
+                   "name": "v01_to_p1", 
+                   "match": {
+                        "standard_metadata.ingress_port": {
+                            "value": "v0.1"
+                        }
+                    },
+                    "action": {
+                       "type": "ingress::forward",
+                       "data": {
+                            "port": {
+                                "value": "p1"
+                            }
+                        } 
+                    } 
+               }
+            ]
+        }
+    }
+}
