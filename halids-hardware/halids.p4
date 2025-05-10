@@ -161,7 +161,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
 
     meta.isTrue = feature <= th ? 1 : 0;
-    meta.prevFeature = f-1;
+    meta.prevFeature = f_inout;
     meta.node_id = node_id;
   }
 
