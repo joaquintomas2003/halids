@@ -160,9 +160,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       feature = meta.feature2;
     }
 
-    if(feature <= th) meta.isTrue = 1;
-    else meta.isTrue = 0;
-
+    meta.isTrue = feature <= th ? 1 : 0;
     meta.prevFeature = f-1;
     meta.node_id = node_id;
   }
@@ -230,6 +228,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
   apply {
     meta.class = CLASS_NOT_SET;
+
     if (hdr.ipv4.isValid()) {
       init_features();
 
