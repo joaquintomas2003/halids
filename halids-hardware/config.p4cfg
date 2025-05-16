@@ -38,7 +38,7 @@
                   "action": {
                       "data": {
                           "threshold": {
-                              "value": "250"
+                              "value": "0"
                           },
                           "node_id": {
                               "value": "3"
