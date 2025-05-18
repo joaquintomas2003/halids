@@ -65,10 +65,18 @@ header udp_t {
 struct metadata {
   bit<64> feature1;
   bit<64> feature2;
+
   bit<16> prevFeature;
   bit<16> isTrue;
+
   bit<16> class;
   bit<16> node_id;
+
+  bit<1> direction;
+  bit<32> register_index;
+
+  bit<8> sttl;
+  bit<8> dttl;
 }
 
 struct headers {
@@ -132,6 +140,54 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
  *************************************************************************/
 
 control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
+  register<bit<8>>(MAX_REGISTER_ENTRIES) reg_ttl;
+  register<bit<8>>(MAX_REGISTER_ENTRIES) reg_dttl;
+
+  action init_register() {
+    //intialise the registers to 0
+    reg_ttl.write(meta.register_index, 0);
+    reg_dttl.write(meta.register_index, 0);
+  }
+
+  action get_register_index_tcp() {
+    //Get register position
+    hash(meta.register_index, HashAlgorithm.crc16, (bit<16>)0, {hdr.ipv4.srcAddr,
+                                                                hdr.ipv4.dstAddr,
+                                                                hdr.tcp.srcPort,
+                                                                hdr.tcp.dstPort,
+                                                                hdr.ipv4.protocol},
+        (bit<32>)MAX_REGISTER_ENTRIES);
+  }
+
+  action get_register_index_udp() {
+      hash(meta.register_index, HashAlgorithm.crc16, (bit<16>)0, {hdr.ipv4.srcAddr,
+                                                                  hdr.ipv4.dstAddr,
+                                                                  hdr.udp.srcPort,
+                                                                  hdr.udp.dstPort,
+                                                                  hdr.ipv4.protocol},
+          (bit<32>)MAX_REGISTER_ENTRIES);
+  }
+
+  action get_register_index_inverse_tcp() {
+      //Get register position for the same flow in another directon
+      // just inverse the src and dst
+      hash(meta.register_index_inverse, HashAlgorithm.crc16, (bit<16>)0, {hdr.ipv4.dstAddr,
+                                                                          hdr.ipv4.srcAddr,
+                                                                          hdr.tcp.dstPort,
+                                                                          hdr.tcp.srcPort,
+                                                                          hdr.ipv4.protocol},
+          (bit<32>)MAX_REGISTER_ENTRIES);
+   }
+
+  action get_register_index_inverse_udp() {
+      hash(meta.register_index_inverse, HashAlgorithm.crc16, (bit<16>)0, {hdr.ipv4.dstAddr,
+                                                                          hdr.ipv4.srcAddr,
+                                                                          hdr.udp.dstPort,
+                                                                          hdr.udp.srcPort,
+                                                                          hdr.ipv4.protocol},
+          (bit<32>)MAX_REGISTER_ENTRIES);
+  }
+
   action drop() {
     mark_to_drop();
   }
@@ -144,8 +200,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   }
 
   action init_features(){
-    meta.feature1 = (bit<64>)hdr.ipv4.protocol;
-    meta.feature2 = (bit<64>)hdr.ipv4.ttl;
+    meta.feature1 = (bit<64>)meta.sttl;
+    meta.feature3 = (bit<64>)meta.dttl;
   }
 
   action CheckFeature(bit<16> node_id, bit<16> f_inout, bit<64> threshold) {
@@ -170,6 +226,23 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   action SetClass(bit<16> node_id, bit<16> class) {
     meta.class = class;
     meta.node_id = node_id;
+  }
+
+  action SetDirection() {
+      //need just for this setting as tcpreplay is sending all the packets to same interface
+      meta.direction = 1;
+  }
+
+  table direction{
+      key = {
+        hdr.ipv4.dstAddr: lpm;
+      }
+      actions = {
+            NoAction;
+            SetDirection;
+      }
+      size = 10;
+      default_action = NoAction();
   }
 
   table level1{
@@ -229,23 +302,55 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   }
 
   apply {
+    direction.apply();
     meta.class = CLASS_NOT_SET;
 
     if (hdr.ipv4.isValid()) {
-      init_features();
+      if (hdr.ipv4.protocol == 6 || hdr.ipv4.protocol == 17) {//We treat only TCP or UDP packets
+        if (meta.direction == 1) {
+          if (hdr.ipv4.protocol == 6) {
+              get_register_index_tcp();
+          }
+          else {
+              get_register_index_udp();
+          }
 
-      // start with parent node of decision tree
-      meta.node_id = 0;
-      meta.prevFeature = 0;
-      meta.isTrue = 1;
+          meta.sttl = hdr.ipv4.ttl;
+          reg_ttl.write((bit<32>)meta.register_index, meta.sttl);
 
-      level1.apply();
-      if (meta.class == CLASS_NOT_SET) {
-        level2.apply();
+          reg_dttl.read(meta.dttl, (bit<32>)meta.register_index);
+        }//end of direction = 1
+
+        else {//direction = 0
+          if (hdr.ipv4.protocol == 6) {
+              get_register_index_inverse_tcp();
+          }
+          else {
+              get_register_index_inverse_udp();
+          }
+
+          meta.register_index = meta.register_index_inverse;
+
+          meta.dttl =  hdr.ipv4.ttl;
+          reg_dttl.write((bit<32>)meta.register_index, meta.dttl);
+          reg_ttl.read(meta.sttl, (bit<32>)meta.register_index);
+        }
+
+        init_features();
+
+        // start with parent node of decision tree
+        meta.node_id = 0;
+        meta.prevFeature = 0;
+        meta.isTrue = 1;
+
+        level1.apply();
         if (meta.class == CLASS_NOT_SET) {
-          level3.apply();
-        } // level2
-      } // level3
+          level2.apply();
+          if (meta.class == CLASS_NOT_SET) {
+            level3.apply();
+          } // level2
+        } // level3
+      }
 
       ipv4_exact.apply();
     }

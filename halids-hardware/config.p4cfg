@@ -185,5 +185,26 @@
               }
           ]
       }
+      "ingress::direction": {
+          "rules": [
+              {
+                  "action": {
+                      "type": "ingress::SetDirection"
+                  }
+                  "name": "set_direction_to_inside",
+                  "match": {
+                      "hdr.ipv4.dstAddr": {
+                          "value": "10.0.0.0/24"
+                      }
+                  }
+              },
+          ],
+          "default_rule": {
+              "name": "default_no_action",
+              "action": {
+                  "type": "ingress::NoAction"
+              }
+          }
+      }
   }
 }
