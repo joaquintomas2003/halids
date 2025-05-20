@@ -4,6 +4,7 @@
 
 const bit<16> TYPE_IPV4 = 0x800;
 #define CLASS_NOT_SET 10000// A big number
+#define MAX_REGISTER_ENTRIES 8192
 
 /*************************************************************************
  *********************** H E A D E R S  ***********************************
@@ -64,7 +65,7 @@ header udp_t {
 
 struct metadata {
   bit<64> feature1;
-  bit<64> feature2;
+  bit<64> feature3;
 
   bit<16> prevFeature;
   bit<16> isTrue;
@@ -74,6 +75,7 @@ struct metadata {
 
   bit<1> direction;
   bit<32> register_index;
+  bit<32> register_index_inverse;
 
   bit<8> sttl;
   bit<8> dttl;
@@ -212,8 +214,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     if (f==1){
       feature = meta.feature1;
     }
-    else if (f==2){
-      feature = meta.feature2;
+    else if (f==3){
+      feature = meta.feature3;
     }
 
     if(feature <= th) meta.isTrue = 1;
@@ -292,7 +294,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.class = CLASS_NOT_SET;
 
     if (hdr.ipv4.isValid()) {
-      if (hdr.ipv4.protocol == 6 || hdr.ipv4.protocol == 17) {//We treat only TCP or UDP packets
+      if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6 || hdr.ipv4.protocol == 17) {//We treat only TCP or UDP packets
         if (meta.direction == 1) {
           if (hdr.ipv4.protocol == 6) {
               get_register_index_tcp();
