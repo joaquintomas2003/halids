@@ -37,17 +37,14 @@
               {
                   "action": {
                       "data": {
-                          "threshold": {
-                              "value": "0"
-                          },
                           "node_id": {
                               "value": "3"
                           },
-                          "f_inout": {
-                              "value": "1"
+                          "class": {
+                              "value": "0"
                           }
                       },
-                      "type": "ingress::CheckFeature"
+                      "type": "ingress::SetClass"
                   },
                   "name": "rule1_level2",
                   "match": {
@@ -130,60 +127,6 @@
               },
               "name": "application_default"
           }
-      },
-      "ingress::level3": {
-          "rules": [
-              {
-                  "action": {
-                      "data": {
-                          "node_id": {
-                              "value": "5"
-                          },
-                          "class": {
-                              "value": "0"
-                          }
-                      },
-                      "type": "ingress::SetClass"
-                  },
-                  "name": "rule1_level3",
-                  "match": {
-                      "ingress::scalars.metadata@node_id": {
-                          "value": "3"
-                      },
-                      "ingress::scalars.metadata@isTrue": {
-                          "value": "1"
-                      },
-                      "ingress::scalars.metadata@prevFeature": {
-                          "value": "1"
-                      }
-                  }
-              },
-              {
-                  "action": {
-                      "data": {
-                          "node_id": {
-                              "value": "4"
-                          },
-                          "class": {
-                              "value": "1"
-                          }
-                      },
-                      "type": "ingress::SetClass"
-                  },
-                  "name": "rule2_level3",
-                  "match": {
-                      "ingress::scalars.metadata@node_id": {
-                          "value": "3"
-                      },
-                      "ingress::scalars.metadata@isTrue": {
-                          "value": "0"
-                      },
-                      "ingress::scalars.metadata@prevFeature": {
-                          "value": "1"
-                      }
-                  }
-              }
-          ]
       }
   }
 }
