@@ -273,20 +273,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     size = 1024;
   }
 
-  table level3{
-    key = {
-      meta.node_id: exact;
-      meta.prevFeature: exact;
-      meta.isTrue: exact;
-    }
-    actions = {
-      NoAction;
-      CheckFeature;
-      SetClass;
-    }
-    size = 1024;
-  }
-
   /* This will send the packet to a specifique port of the switch for output*/
   table ipv4_exact {
     key = {
@@ -346,10 +332,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         level1.apply();
         if (meta.class == CLASS_NOT_SET) {
           level2.apply();
-          if (meta.class == CLASS_NOT_SET) {
-            level3.apply();
-          } // level2
-        } // level3
+        } // level2
       }
 
       ipv4_exact.apply();
