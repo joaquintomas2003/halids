@@ -32,63 +32,6 @@
               }
           ]
       },
-      "ingress::level2": {
-          "rules": [
-              {
-                  "action": {
-                      "data": {
-                          "threshold": {
-                              "value": "0"
-                          },
-                          "node_id": {
-                              "value": "3"
-                          },
-                          "f_inout": {
-                              "value": "1"
-                          }
-                      },
-                      "type": "ingress::CheckFeature"
-                  },
-                  "name": "rule1_level2",
-                  "match": {
-                      "ingress::scalars.metadata@node_id": {
-                          "value": "1"
-                      },
-                      "ingress::scalars.metadata@isTrue": {
-                          "value": "1"
-                      },
-                      "ingress::scalars.metadata@prevFeature": {
-                          "value": "0"
-                      }
-                  }
-              },
-              {
-                  "action": {
-                      "data": {
-                          "node_id": {
-                              "value": "2"
-                          },
-                          "class": {
-                              "value": "1"
-                          }
-                      },
-                      "type": "ingress::SetClass"
-                  },
-                  "name": "rule2_level2",
-                  "match": {
-                      "ingress::scalars.metadata@node_id": {
-                          "value": "1"
-                      },
-                      "ingress::scalars.metadata@isTrue": {
-                          "value": "0"
-                      },
-                      "ingress::scalars.metadata@prevFeature": {
-                          "value": "0"
-                      }
-                  }
-              }
-          ]
-      },
       "ingress::ipv4_exact": {
           "rules": [
               {
@@ -131,13 +74,13 @@
               "name": "application_default"
           }
       },
-      "ingress::level3": {
+      "ingress::level2": {
           "rules": [
               {
                   "action": {
                       "data": {
                           "node_id": {
-                              "value": "5"
+                              "value": "2"
                           },
                           "class": {
                               "value": "0"
@@ -145,16 +88,16 @@
                       },
                       "type": "ingress::SetClass"
                   },
-                  "name": "rule1_level3",
+                  "name": "rule1_level2",
                   "match": {
                       "ingress::scalars.metadata@node_id": {
-                          "value": "3"
+                          "value": "1"
                       },
                       "ingress::scalars.metadata@isTrue": {
                           "value": "1"
                       },
                       "ingress::scalars.metadata@prevFeature": {
-                          "value": "1"
+                          "value": "0"
                       }
                   }
               },
@@ -162,7 +105,7 @@
                   "action": {
                       "data": {
                           "node_id": {
-                              "value": "4"
+                              "value": "3"
                           },
                           "class": {
                               "value": "1"
@@ -170,16 +113,31 @@
                       },
                       "type": "ingress::SetClass"
                   },
-                  "name": "rule2_level3",
+                  "name": "rule2_level2",
                   "match": {
                       "ingress::scalars.metadata@node_id": {
-                          "value": "3"
+                          "value": "1"
                       },
                       "ingress::scalars.metadata@isTrue": {
                           "value": "0"
                       },
                       "ingress::scalars.metadata@prevFeature": {
-                          "value": "1"
+                          "value": "0"
+                      }
+                  }
+              }
+          ]
+      },
+      "ingress::direction": {
+          "rules": [
+              {
+                  "action": {
+                      "type": "ingress::SetDirection"
+                  },
+                  "name": "set_direction_to_inside",
+                  "match": {
+                      "ipv4.dstAddr": {
+                          "value": "10.0.0.0/24"
                       }
                   }
               }
