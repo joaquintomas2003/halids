@@ -1,0 +1,13 @@
+if [ -z "$1" ]; then
+  echo "Usage: connect_namespace <namespace-number>"
+  exit 1
+fi
+
+NS="ns-$1"
+
+if ip netns list | grep -qw "$NS"; then
+  sudo ip netns exec "$NS" bash
+else
+  echo "Namespace $NS not found."
+  exit 1
+fi
