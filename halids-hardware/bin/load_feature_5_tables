@@ -1,0 +1,39 @@
+set -e
+
+/opt/netronome/p4/bin/rtecli tables add \
+  --table-name ingress::level1 \
+  --rule rule1_level1 \
+  --match '{"ingress::scalars.metadata@node_id": {"value": "0"}, "ingress::scalars.metadata@isTrue": {"value": "1"}, "ingress::scalars.metadata@prevFeature": {"value": "0"}}' \
+  --action '{"type": "ingress::CheckFeature", "data": {"threshold": {"value": "8"}, "node_id": {"value": "1"}, "f_inout": {"value": "0"}}}'
+
+/opt/netronome/p4/bin/rtecli tables add \
+  --table-name ingress::level2 \
+  --rule rule1_level2 \
+  --match '{"ingress::scalars.metadata@node_id": {"value": "1"}, "ingress::scalars.metadata@isTrue": {"value": "1"}, "ingress::scalars.metadata@prevFeature": {"value": "4"}}' \
+  --action '{"type": "ingress::SetClass", "data": {"node_id": {"value": "2"}, "class": {"value": "0"}}}'
+
+/opt/netronome/p4/bin/rtecli tables add \
+  --table-name ingress::level2 \
+  --rule rule2_level2 \
+  --match '{"ingress::scalars.metadata@node_id": {"value": "1"}, "ingress::scalars.metadata@isTrue": {"value": "0"}, "ingress::scalars.metadata@prevFeature": {"value": "4"}}' \
+  --action '{"type": "ingress::SetClass", "data": {"node_id": {"value": "3"}, "class": {"value": "1"}}}'
+
+/opt/netronome/p4/bin/rtecli tables add \
+  --table-name ingress::ipv4_exact \
+  --rule forward_normal_traffic \
+  --match '{"ingress::scalars.metadata@class": {"value": "0"}}' \
+  --action '{"type": "ingress::ipv4_forward", "data": {"port": {"value": "v0.2"}}}'
+
+/opt/netronome/p4/bin/rtecli tables add \
+  --table-name ingress::ipv4_exact \
+  --rule forward_malware \
+  --match '{"ingress::scalars.metadata@class": {"value": "1"}}' \
+  --action '{"type": "ingress::ipv4_forward", "data": {"port": {"value": "v0.3"}}}'
+
+/opt/netronome/p4/bin/rtecli tables add \
+  --table-name ingress::direction \
+  --rule set_direction_to_inside \
+  --match '{"ipv4.dstAddr": {"value": "10.0.0.0/24"}}' \
+  --action '{"type": "ingress::SetDirection"}'
+
+echo "All tables loaded successfully!"
