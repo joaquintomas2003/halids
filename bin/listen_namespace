@@ -1,0 +1,15 @@
+if [ -z "$1" ]; then
+  echo "Usage: listen_namespace <namespace-number>"
+  exit 1
+fi
+
+NS="ns-$1"
+IF="vf0_$1"
+
+if ip netns list | grep -qw "$NS"; then
+  echo "Listening on $IF in $NS..."
+  sudo ip netns exec "$NS" tcpdump -i "$IF"
+else
+  echo "Namespace $NS not found."
+  exit 1
+fi
