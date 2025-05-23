@@ -66,6 +66,7 @@ header udp_t {
 struct metadata {
   bit<64> feature1;
   bit<64> feature3;
+  bit<64> feature5;
 
   bit<16> prevFeature;
   bit<16> isTrue;
@@ -79,6 +80,7 @@ struct metadata {
 
   bit<8> sttl;
   bit<8> dttl;
+  bit<32> dpkts;
 }
 
 struct headers {
@@ -144,11 +146,13 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
   register<bit<8>>(MAX_REGISTER_ENTRIES) reg_ttl;
   register<bit<8>>(MAX_REGISTER_ENTRIES) reg_dttl;
+  register<bit<32>>(MAX_REGISTER_ENTRIES) reg_dpkts;
 
   action init_register() {
     //intialise the registers to 0
     reg_ttl.write(meta.register_index, 0);
     reg_dttl.write(meta.register_index, 0);
+    reg_dpkts.write(meta.register_index, 0);
   }
 
   action get_register_index_tcp() {
@@ -204,6 +208,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   action init_features(){
     meta.feature1 = (bit<64>)meta.sttl;
     meta.feature3 = (bit<64>)meta.dttl;
+    meta.feature5 = (bit<64>)meta.dpkts;
   }
 
   action CheckFeature(bit<16> node_id, bit<16> f_inout, bit<64> threshold) {
@@ -216,6 +221,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
     else if (f==3){
       feature = meta.feature3;
+    }
+    else if (f==5){
+      feature = meta.feature5;
     }
 
     if(feature <= th) meta.isTrue = 1;
@@ -318,6 +326,10 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           }
 
           meta.register_index = meta.register_index_inverse;
+
+          reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
+          meta.dpkts = meta.dpkts + 1;
+          reg_dpkts.write((bit<32>)meta.register_index, meta.dpkts);
 
           meta.dttl =  hdr.ipv4.ttl;
           reg_dttl.write((bit<32>)meta.register_index, meta.dttl);
