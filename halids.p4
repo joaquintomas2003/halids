@@ -148,6 +148,11 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<8>>(MAX_REGISTER_ENTRIES) reg_dttl;
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_dpkts;
 
+  counter(1, CounterType.packets) counter_malware;
+  counter(2, CounterType.packets) counter_not_malware;
+  counter(3, CounterType.packets) counter_pkts;
+  counter(4, CounterType.packets) counter_pkts_ip;
+
   action init_register() {
     //intialise the registers to 0
     reg_ttl.write(meta.register_index, 0);
@@ -238,23 +243,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.node_id = node_id;
   }
 
-  action SetDirection() {
-      //need just for this setting as tcpreplay is sending all the packets to same interface
-      meta.direction = 1;
-  }
-
-  table direction{
-      key = {
-        hdr.ipv4.dstAddr: lpm;
-      }
-      actions = {
-            NoAction;
-            SetDirection;
-      }
-      size = 10;
-      default_action = NoAction();
-  }
-
   table level1{
     key = {
       meta.node_id: exact;
@@ -298,10 +286,13 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   }
 
   apply {
-    direction.apply();
+    meta.direction = 1;
+    counter_pkts.count(0);
     meta.class = CLASS_NOT_SET;
 
     if (hdr.ipv4.isValid()) {
+      counter_pkts_ip.count(0);
+
       if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6 || hdr.ipv4.protocol == 17) {//We treat only TCP or UDP packets
         if (meta.direction == 1) {
           if (hdr.ipv4.protocol == 6) {
@@ -348,6 +339,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           level2.apply();
         } // level2
       }
+
+      if(meta.isTrue == 0) counter_malware.count(0);
+      else counter_not_malware.count(0);
 
       ipv4_exact.apply();
     }
