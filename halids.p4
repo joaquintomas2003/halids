@@ -148,10 +148,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<8>>(MAX_REGISTER_ENTRIES) reg_dttl;
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_dpkts;
 
-  counter(1, CounterType.packets) counter_malware;
-  counter(2, CounterType.packets) counter_not_malware;
-  counter(3, CounterType.packets) counter_pkts;
-  counter(4, CounterType.packets) counter_pkts_ip;
+  coun1er(2, CounterType.packets) counter_malware;
+  counter(1, CounterType.packets) counter_pkts;
+  counter(1, CounterType.packets) counter_pkts_ip;
 
   action init_register() {
     //intialise the registers to 0
@@ -341,7 +340,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       }
 
       if(meta.isTrue == 0) counter_malware.count(0);
-      else counter_not_malware.count(0);
+      else counter_not_malware.count(1);
 
       ipv4_exact.apply();
     }
