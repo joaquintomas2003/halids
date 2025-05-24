@@ -3,7 +3,6 @@
 #include <v1model.p4>
 
 const bit<16> TYPE_IPV4 = 0x800;
-#define FLOW_TIMEOUT 15000000 //15 seconds
 #define CLASS_NOT_SET 10000// A big number
 #define MAX_REGISTER_ENTRIES 8192
 
@@ -88,8 +87,6 @@ struct metadata {
   bit<8> dttl;
 
   bit<32> dpkts;
-  bit<48> time_last_pkt;
-  bit<48> time_first_pkt;
 
   bit<1> is_first;
   bit<1> is_hash_collision;
@@ -166,12 +163,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<16>>(max_register_entries) reg_srcport;
   register<bit<16>>(max_register_entries) reg_dstport;
 
-  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_last_pkt;
-  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
-
   action init_register() {
     //intialise the registers to 0
-    reg_time_last_pkt.write(meta.register_index, 0);
     reg_srcip.write(meta.register_index, 0);
     reg_srcport.write(meta.register_index, 0);
     reg_dstport.write(meta.register_index, 0);
@@ -346,17 +339,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           reg_srcip.read(meta.srcip, meta.register_index);
           reg_srcport.read(meta.srcport, meta.register_index);
           reg_dstport.read(meta.dstport, meta.register_index);
-          reg_time_last_pkt.read(meta.time_last_pkt, (bit<32>)meta.register_index);
 
           if (meta.srcip == 0) {//It was an empty register
-            meta.is_first = 1;
-          }
-          else if ((standard_metadata.ingress_global_timestamp - meta.time_last_pkt) > FLOW_TIMEOUT) {
-            /*We havent heard from this flow it has been FLOW_TIMEOUT
-              We will initialse the register space
-              TODO check if init_register() is initialising all and only those needed. ;
-             */
-            init_register();
             meta.is_first = 1;
           }
           else if (meta.srcip != hdr.ipv4.srcAddr || meta.srcport != meta.hdr_srcport
@@ -368,8 +352,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
           if (meta.is_hash_collision == 0) {
             if (meta.is_first == 1) {
-              meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
-              reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
               reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.srcAddr);
               reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
               reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
@@ -407,16 +389,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           reg_srcip.read(meta.srcip, meta.register_index);
           reg_srcport.read(meta.srcport, meta.register_index);
           reg_dstport.read(meta.dstport, meta.register_index);
-          reg_time_last_pkt.read(meta.time_last_pkt, (bit<32>)meta.register_index);
           if (meta.srcip == 0) {//It was an empty register
-            meta.is_first = 1;
-          }
-          else if ((standard_metadata.ingress_global_timestamp - meta.time_last_pkt) > FLOW_TIMEOUT) {
-            /*We havent heard from this flow it has been FLOW_TIMEOUT
-              We will initialse the register space
-              TODO check if init_register() is initialising all and only those needed. ;
-             */
-            init_register();
             meta.is_first = 1;
           }
           else if (meta.srcip != hdr.ipv4.dstAddr || meta.srcport != meta.hdr_srcport
@@ -428,8 +401,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
           if (meta.is_hash_collision == 0) {
             if (meta.is_first == 1) {//shouldn't happen!
-              meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
-              reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
               reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.dstAddr);
               reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
               reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
@@ -440,9 +411,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             meta.dpkts = meta.dpkts + 1;
             reg_dpkts.write((bit<32>)meta.register_index, meta.dpkts);
 
-            reg_time_last_pkt.write((bit<32>)meta.register_index,
-                standard_metadata.ingress_global_timestamp );
-
             meta.dttl =  hdr.ipv4.ttl;
             reg_dttl.write((bit<32>)meta.register_index, meta.dttl);
             reg_ttl.read(meta.sttl, (bit<32>)meta.register_index);
@@ -450,12 +418,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }
 
         if (meta.is_hash_collision == 0) {
-          reg_time_first_pkt.read(meta.time_first_pkt, (bit<32>)meta.register_index);
-
-          reg_time_last_pkt.write((bit<32>)meta.register_index,
-              standard_metadata.ingress_global_timestamp );
-
-
           init_features();
 
           //start with parent node of decision tree
