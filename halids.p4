@@ -118,7 +118,7 @@ parser MyParser(packet_in packet,
   state parse_ethernet {
     packet.extract(hdr.ethernet);
     transition select(hdr.ethernet.etherType) {
-      TYPE_IPV4: parse_ipv4;
+TYPE_IPV4: parse_ipv4;
       default: accept;
     }
   }
@@ -126,8 +126,8 @@ parser MyParser(packet_in packet,
   state parse_ipv4 {
     packet.extract(hdr.ipv4);
     transition select(hdr.ipv4.protocol) {
-      6: parse_tcp;
-      17: parse_udp;
+6: parse_tcp;
+17: parse_udp;
       default: accept;
     }
   }
@@ -183,40 +183,40 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   action get_register_index_tcp() {
     //Get register position
     hash(meta.register_index, HashAlgorithm.crc16, (bit<16>)0, {hdr.ipv4.srcAddr,
-                                                                hdr.ipv4.dstAddr,
-                                                                hdr.tcp.srcPort,
-                                                                hdr.tcp.dstPort,
-                                                                hdr.ipv4.protocol},
+        hdr.ipv4.dstAddr,
+        hdr.tcp.srcPort,
+        hdr.tcp.dstPort,
+        hdr.ipv4.protocol},
         (bit<32>)MAX_REGISTER_ENTRIES);
   }
 
   action get_register_index_udp() {
-      hash(meta.register_index, HashAlgorithm.crc16, (bit<16>)0, {hdr.ipv4.srcAddr,
-                                                                  hdr.ipv4.dstAddr,
-                                                                  hdr.udp.srcPort,
-                                                                  hdr.udp.dstPort,
-                                                                  hdr.ipv4.protocol},
-          (bit<32>)MAX_REGISTER_ENTRIES);
+    hash(meta.register_index, HashAlgorithm.crc16, (bit<16>)0, {hdr.ipv4.srcAddr,
+        hdr.ipv4.dstAddr,
+        hdr.udp.srcPort,
+        hdr.udp.dstPort,
+        hdr.ipv4.protocol},
+        (bit<32>)MAX_REGISTER_ENTRIES);
   }
 
   action get_register_index_inverse_tcp() {
-      //Get register position for the same flow in another directon
-      // just inverse the src and dst
-      hash(meta.register_index_inverse, HashAlgorithm.crc16, (bit<16>)0, {hdr.ipv4.dstAddr,
-                                                                          hdr.ipv4.srcAddr,
-                                                                          hdr.tcp.dstPort,
-                                                                          hdr.tcp.srcPort,
-                                                                          hdr.ipv4.protocol},
-          (bit<32>)MAX_REGISTER_ENTRIES);
-   }
+    //Get register position for the same flow in another directon
+    // just inverse the src and dst
+    hash(meta.register_index_inverse, HashAlgorithm.crc16, (bit<16>)0, {hdr.ipv4.dstAddr,
+        hdr.ipv4.srcAddr,
+        hdr.tcp.dstPort,
+        hdr.tcp.srcPort,
+        hdr.ipv4.protocol},
+        (bit<32>)MAX_REGISTER_ENTRIES);
+  }
 
   action get_register_index_inverse_udp() {
-      hash(meta.register_index_inverse, HashAlgorithm.crc16, (bit<16>)0, {hdr.ipv4.dstAddr,
-                                                                          hdr.ipv4.srcAddr,
-                                                                          hdr.udp.dstPort,
-                                                                          hdr.udp.srcPort,
-                                                                          hdr.ipv4.protocol},
-          (bit<32>)MAX_REGISTER_ENTRIES);
+    hash(meta.register_index_inverse, HashAlgorithm.crc16, (bit<16>)0, {hdr.ipv4.dstAddr,
+        hdr.ipv4.srcAddr,
+        hdr.udp.dstPort,
+        hdr.udp.srcPort,
+        hdr.ipv4.protocol},
+        (bit<32>)MAX_REGISTER_ENTRIES);
   }
 
   action drop() {
@@ -264,20 +264,20 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   }
 
   action SetDirection() {
-      //need just for this setting as tcpreplay is sending all the packets to same interface
-      meta.direction = 1;
+    //need just for this setting as tcpreplay is sending all the packets to same interface
+    meta.direction = 1;
   }
 
   table direction{
-      key = {
-        hdr.ipv4.dstAddr: lpm;
-      }
-      actions = {
-            NoAction;
-            SetDirection;
-      }
-      size = 10;
-      default_action = NoAction();
+    key = {
+      hdr.ipv4.dstAddr: lpm;
+    }
+    actions = {
+      NoAction;
+      SetDirection;
+    }
+    size = 10;
+    default_action = NoAction();
   }
 
   table level1{
@@ -332,14 +332,14 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6 || hdr.ipv4.protocol == 17) {//We treat only TCP or UDP packets (and ICMP for testing)
         if (meta.direction == 1) {
           if (hdr.ipv4.protocol == 6) {
-              get_register_index_tcp();
-              meta.hdr_srcport = hdr.tcp.srcPort;
-              meta.hdr_dstport = hdr.tcp.dstPort;
+            get_register_index_tcp();
+            meta.hdr_srcport = hdr.tcp.srcPort;
+            meta.hdr_dstport = hdr.tcp.dstPort;
           }
           else {
-              get_register_index_udp();
-              meta.hdr_srcport = hdr.udp.srcPort;
-              meta.hdr_dstport = hdr.udp.dstPort;
+            get_register_index_udp();
+            meta.hdr_srcport = hdr.udp.srcPort;
+            meta.hdr_dstport = hdr.udp.dstPort;
           }
 
           //read_reg_to_check_collision srcip, srcport, dstport
@@ -349,56 +349,56 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           reg_time_last_pkt.read(meta.time_last_pkt, (bit<32>)meta.register_index);
 
           if (meta.srcip == 0) {//It was an empty register
-              meta.is_first = 1;
+            meta.is_first = 1;
           }
           else if ((standard_metadata.ingress_global_timestamp - meta.time_last_pkt) > FLOW_TIMEOUT) {
-              /*We havent heard from this flow it has been FLOW_TIMEOUT
+            /*We havent heard from this flow it has been FLOW_TIMEOUT
               We will initialse the register space
               TODO check if init_register() is initialising all and only those needed. ;
-              */
-              init_register();
-              meta.is_first = 1;
+             */
+            init_register();
+            meta.is_first = 1;
           }
           else if (meta.srcip != hdr.ipv4.srcAddr || meta.srcport != meta.hdr_srcport
-          || meta.dstport != meta.hdr_dstport) {
-              //Hash collision!
-              //TODO handle hash collisions in a better way!
-              meta.is_hash_collision = 1;
+              || meta.dstport != meta.hdr_dstport) {
+            //Hash collision!
+            //TODO handle hash collisions in a better way!
+            meta.is_hash_collision = 1;
           }
 
           if (meta.is_hash_collision == 0) {
-              if (meta.is_first == 1) {
-                  meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
-                  reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
-                  reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.srcAddr);
-                  reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
-                  reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
-              }
+            if (meta.is_first == 1) {
+              meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
+              reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
+              reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.srcAddr);
+              reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
+              reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
+            }
 
-              meta.sttl = hdr.ipv4.ttl;
-              reg_ttl.write((bit<32>)meta.register_index, meta.sttl);
+            meta.sttl = hdr.ipv4.ttl;
+            reg_ttl.write((bit<32>)meta.register_index, meta.sttl);
 
-              reg_dttl.read(meta.dttl, (bit<32>)meta.register_index);
+            reg_dttl.read(meta.dttl, (bit<32>)meta.register_index);
 
-              // tcprtt
-              //SYN TIME
-              //TODO: if-else calculo tcprtt
+            // tcprtt
+            //SYN TIME
+            //TODO: if-else calculo tcprtt
 
-              //read all reverse flow features
-              reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
+            //read all reverse flow features
+            reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
           }//hash collision check
         }//end of direction = 1
 
         else {//direction = 0
           if (hdr.ipv4.protocol == 6) {
-              get_register_index_inverse_tcp();
-              meta.hdr_srcport = hdr.tcp.dstPort;//its inverse
-              meta.hdr_dstport = hdr.tcp.srcPort;
+            get_register_index_inverse_tcp();
+            meta.hdr_srcport = hdr.tcp.dstPort;//its inverse
+            meta.hdr_dstport = hdr.tcp.srcPort;
           }
           else {
-              get_register_index_inverse_udp();
-              meta.hdr_srcport = hdr.udp.dstPort;
-              meta.hdr_dstport = hdr.udp.srcPort;
+            get_register_index_inverse_udp();
+            meta.hdr_srcport = hdr.udp.dstPort;
+            meta.hdr_dstport = hdr.udp.srcPort;
           }
 
           meta.register_index = meta.register_index_inverse;
@@ -409,69 +409,68 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           reg_dstport.read(meta.dstport, meta.register_index);
           reg_time_last_pkt.read(meta.time_last_pkt, (bit<32>)meta.register_index);
           if (meta.srcip == 0) {//It was an empty register
-              meta.is_first = 1;
+            meta.is_first = 1;
           }
           else if ((standard_metadata.ingress_global_timestamp - meta.time_last_pkt) > FLOW_TIMEOUT) {
-              /*We havent heard from this flow it has been FLOW_TIMEOUT
+            /*We havent heard from this flow it has been FLOW_TIMEOUT
               We will initialse the register space
               TODO check if init_register() is initialising all and only those needed. ;
-              */
-              init_register();
-              meta.is_first = 1;
+             */
+            init_register();
+            meta.is_first = 1;
           }
           else if (meta.srcip != hdr.ipv4.dstAddr || meta.srcport != meta.hdr_srcport
-          || meta.dstport != meta.hdr_dstport) {
-              //Hash collision!
-              //TODO handle hash collisions in a better way!
-              meta.is_hash_collision = 1;
+              || meta.dstport != meta.hdr_dstport) {
+            //Hash collision!
+            //TODO handle hash collisions in a better way!
+            meta.is_hash_collision = 1;
           }
 
           if (meta.is_hash_collision == 0) {
-              if (meta.is_first == 1) {//shouldn't happen!
-                  meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
-                  reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
-                  reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.dstAddr);
-                  reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
-                  reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
+            if (meta.is_first == 1) {//shouldn't happen!
+              meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
+              reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
+              reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.dstAddr);
+              reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
+              reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
 
-              }
+            }
 
-              reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
-              meta.dpkts = meta.dpkts + 1;
-              reg_dpkts.write((bit<32>)meta.register_index, meta.dpkts);
+            reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
+            meta.dpkts = meta.dpkts + 1;
+            reg_dpkts.write((bit<32>)meta.register_index, meta.dpkts);
 
-                  reg_time_last_pkt.write((bit<32>)meta.register_index,
-                      standard_metadata.ingress_global_timestamp );
+            reg_time_last_pkt.write((bit<32>)meta.register_index,
+                standard_metadata.ingress_global_timestamp );
 
-              meta.dttl =  hdr.ipv4.ttl;
-              reg_dttl.write((bit<32>)meta.register_index, meta.dttl);
-              reg_ttl.read(meta.sttl, (bit<32>)meta.register_index);
+            meta.dttl =  hdr.ipv4.ttl;
+            reg_dttl.write((bit<32>)meta.register_index, meta.dttl);
+            reg_ttl.read(meta.sttl, (bit<32>)meta.register_index);
           }//hash collision check
         }
 
         if (meta.is_hash_collision == 0) {
-            reg_time_first_pkt.read(meta.time_first_pkt, (bit<32>)meta.register_index);
+          reg_time_first_pkt.read(meta.time_first_pkt, (bit<32>)meta.register_index);
 
-            reg_time_last_pkt.write((bit<32>)meta.register_index,
-                        standard_metadata.ingress_global_timestamp );
+          reg_time_last_pkt.write((bit<32>)meta.register_index,
+              standard_metadata.ingress_global_timestamp );
 
 
-            init_features();
+          init_features();
 
-            //start with parent node of decision tree
-            meta.node_id = 0;
-            meta.prevFeature = 0;
-            meta.isTrue = 1;
+          //start with parent node of decision tree
+          meta.node_id = 0;
+          meta.prevFeature = 0;
+          meta.isTrue = 1;
 
-            //TODO if malware
+          //TODO if malware
 
-            level1.apply();
-            if (meta.class == CLASS_NOT_SET) {
-              level2.apply();
-            } // level2
-    }//hash collision check
-
-    }
+          level1.apply();
+          if (meta.class == CLASS_NOT_SET) {
+            level2.apply();
+          } // level2
+        }//hash collision check
+      }
 
       ipv4_exact.apply();
     }
@@ -493,21 +492,21 @@ control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata
 control MyComputeChecksum(inout headers  hdr, inout metadata meta) {
   apply {
     update_checksum(
-      hdr.ipv4.isValid(),
-      { hdr.ipv4.version,
-      hdr.ipv4.ihl,
-      hdr.ipv4.diffserv,
-      hdr.ipv4.totalLen,
-      hdr.ipv4.identification,
-      hdr.ipv4.flags,
-      hdr.ipv4.fragOffset,
-      hdr.ipv4.ttl,
-      hdr.ipv4.protocol,
-      hdr.ipv4.srcAddr,
-      hdr.ipv4.dstAddr },
-      hdr.ipv4.hdrChecksum,
-      HashAlgorithm.csum16
-    );
+        hdr.ipv4.isValid(),
+        { hdr.ipv4.version,
+        hdr.ipv4.ihl,
+        hdr.ipv4.diffserv,
+        hdr.ipv4.totalLen,
+        hdr.ipv4.identification,
+        hdr.ipv4.flags,
+        hdr.ipv4.fragOffset,
+        hdr.ipv4.ttl,
+        hdr.ipv4.protocol,
+        hdr.ipv4.srcAddr,
+        hdr.ipv4.dstAddr },
+        hdr.ipv4.hdrChecksum,
+        HashAlgorithm.csum16
+        );
   }
 }
 
@@ -528,11 +527,11 @@ control MyDeparser(packet_out packet, in headers hdr) {
  ***********************  S W I T C H  *******************************
  *************************************************************************/
 
-V1Switch(
-  MyParser(),
-  MyVerifyChecksum(),
-  MyIngress(),
-  MyEgress(),
-  MyComputeChecksum(),
-  MyDeparser()
-) main;
+  V1Switch(
+      MyParser(),
+      MyVerifyChecksum(),
+      MyIngress(),
+      MyEgress(),
+      MyComputeChecksum(),
+      MyDeparser()
+      ) main;
