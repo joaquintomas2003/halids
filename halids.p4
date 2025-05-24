@@ -159,9 +159,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_dpkts;
 
   //Registers for identifying the flow more apart from hash we may use source port
-  register<bit<32>>(max_register_entries) reg_srcip;
-  register<bit<16>>(max_register_entries) reg_srcport;
-  register<bit<16>>(max_register_entries) reg_dstport;
+  register<bit<32>>(MAX_REGISTER_ENTRIES) reg_srcip;
+  register<bit<16>>(MAX_REGISTER_ENTRIES) reg_srcport;
+  register<bit<16>>(MAX_REGISTER_ENTRIES) reg_dstport;
 
   action init_register() {
     //intialise the registers to 0
