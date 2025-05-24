@@ -6,6 +6,14 @@ const bit<16> TYPE_IPV4 = 0x800;
 #define CLASS_NOT_SET 10000// A big number
 #define MAX_REGISTER_ENTRIES 8192
 
+#define STATE_INT 1
+#define STATE_FIN 2
+#define STATE_REQ 3
+#define STATE_CON 4
+#define STATE_ACC 5
+#define STATE_CLO 6
+#define STATE_EST 7
+
 /*************************************************************************
  *********************** H E A D E R S  ***********************************
  *************************************************************************/
@@ -90,6 +98,8 @@ struct metadata {
 
   bit<1> is_first;
   bit<1> is_hash_collision;
+
+  bit<8> state;
 }
 
 struct headers {
@@ -219,6 +229,27 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
   action drop() {
     mark_to_drop();
+  }
+
+  action calc_state() {
+      //When Sload or Dload is 0 the state can be INT
+      //Thus need to calculate sload, dload before
+      // XX TODO Argus log shows only last state!
+      //XX TODO The following logic is only approx. correct!
+      if ((meta.is_first == 1)||(meta.dttl == 0)) {
+          if (hdr.ipv4.protocol == 6) //TCP
+              meta.state = STATE_REQ;
+          else meta.state = STATE_INT;
+      }
+      else {
+          if (hdr.ipv4.protocol == 6) //TCP
+                  meta.state = STATE_EST;
+          else meta.state = STATE_CON;
+      }
+      //TODO for STATE_FIN, which may not be useful as it would be last packet of transaction
+      if (hdr.ipv4.protocol == 6 && hdr.tcp.fin == (bit<1>)1) {
+          meta.state = STATE_FIN;
+      }
   }
 
   action ipv4_forward(egressSpec_t port) {
@@ -426,6 +457,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }
 
         if (meta.is_hash_collision == 0) {
+          calc_state();
+
           init_features();
 
           //start with parent node of decision tree
