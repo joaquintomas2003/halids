@@ -73,6 +73,7 @@ header udp_t {
 
 struct metadata {
   bit<64> feature1;
+  bit<64> feature2;
   bit<64> feature3;
   bit<64> feature5;
 
@@ -100,6 +101,7 @@ struct metadata {
   bit<1> is_hash_collision;
 
   bit<8> state;
+  bit<8> ct_state_ttl;
 }
 
 struct headers {
@@ -252,6 +254,35 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       }
   }
 
+  action calc_ct_state_ttl(){
+      meta.ct_state_ttl = 0;
+      if ((meta.sttl == 62 || meta.sttl == 63 || meta.sttl == 254 || meta.sttl == 255)
+      && (meta.dttl == 252 || meta.dttl == 253) && meta.state == STATE_FIN) {
+              meta.ct_state_ttl = 1;
+    }
+      else if ((meta.sttl == 0 || meta.sttl == 62 || meta.sttl == 254)
+          && (meta.dttl == 0) && meta.state == STATE_INT) {
+              meta.ct_state_ttl = 2;
+    }
+      else if((meta.sttl == 62 || meta.sttl == 254)
+          && (meta.dttl == 60 || meta.dttl == 252 || meta.dttl == 253)
+          && meta.state == STATE_CON){
+                  meta.ct_state_ttl = 3;
+          }
+          else if((meta.sttl == 254) && (meta.dttl == 252) && meta.state == STATE_ACC){
+              meta.ct_state_ttl = 4;
+          }
+          else if((meta.sttl == 254) && (meta.dttl == 252) && meta.state == STATE_CLO){
+              meta.ct_state_ttl = 5;
+          }
+          else if((meta.sttl == 254) && (meta.dttl == 0) && meta.state == STATE_REQ){
+              meta.ct_state_ttl = 7;
+          }
+          else {
+  meta.ct_state_ttl = 0;
+    }
+  }
+
   action ipv4_forward(egressSpec_t port) {
     standard_metadata.egress_spec = port;
     //hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
@@ -261,6 +292,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
   action init_features(){
     meta.feature1 = (bit<64>)meta.sttl;
+    meta.feature2 = (bit<64>)meta.ct_state_ttl;
     meta.feature3 = (bit<64>)meta.dttl;
     meta.feature5 = (bit<64>)meta.dpkts;
   }
@@ -272,6 +304,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
     if (f==1){
       feature = meta.feature1;
+    }
+    else if (f == 2) {
+        feature = meta.feature2;
     }
     else if (f==3){
       feature = meta.feature3;
@@ -458,6 +493,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
         if (meta.is_hash_collision == 0) {
           calc_state();
+          calc_ct_state_ttl();
 
           init_features();
 
