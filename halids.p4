@@ -234,52 +234,52 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   }
 
   action calc_state() {
-      //When Sload or Dload is 0 the state can be INT
-      //Thus need to calculate sload, dload before
-      // XX TODO Argus log shows only last state!
-      //XX TODO The following logic is only approx. correct!
-      if ((meta.is_first == 1)||(meta.dttl == 0)) {
-          if (hdr.ipv4.protocol == 6) //TCP
-              meta.state = STATE_REQ;
-          else meta.state = STATE_INT;
-      }
-      else {
-          if (hdr.ipv4.protocol == 6) //TCP
-                  meta.state = STATE_EST;
-          else meta.state = STATE_CON;
-      }
-      //TODO for STATE_FIN, which may not be useful as it would be last packet of transaction
-      if (hdr.ipv4.protocol == 6 && hdr.tcp.fin == (bit<1>)1) {
-          meta.state = STATE_FIN;
-      }
+    //When Sload or Dload is 0 the state can be INT
+    //Thus need to calculate sload, dload before
+    // XX TODO Argus log shows only last state!
+    //XX TODO The following logic is only approx. correct!
+    if ((meta.is_first == 1)||(meta.dttl == 0)) {
+      if (hdr.ipv4.protocol == 6) //TCP
+        meta.state = STATE_REQ;
+      else meta.state = STATE_INT;
+    }
+    else {
+      if (hdr.ipv4.protocol == 6) //TCP
+        meta.state = STATE_EST;
+      else meta.state = STATE_CON;
+    }
+    //TODO for STATE_FIN, which may not be useful as it would be last packet of transaction
+    if (hdr.ipv4.protocol == 6 && hdr.tcp.fin == (bit<1>)1) {
+      meta.state = STATE_FIN;
+    }
   }
 
   action calc_ct_state_ttl(){
+    meta.ct_state_ttl = 0;
+    if ((meta.sttl == 62 || meta.sttl == 63 || meta.sttl == 254 || meta.sttl == 255)
+        && (meta.dttl == 252 || meta.dttl == 253) && meta.state == STATE_FIN) {
+      meta.ct_state_ttl = 1;
+    }
+    else if ((meta.sttl == 0 || meta.sttl == 62 || meta.sttl == 254)
+        && (meta.dttl == 0) && meta.state == STATE_INT) {
+      meta.ct_state_ttl = 2;
+    }
+    else if((meta.sttl == 62 || meta.sttl == 254)
+        && (meta.dttl == 60 || meta.dttl == 252 || meta.dttl == 253)
+        && meta.state == STATE_CON){
+      meta.ct_state_ttl = 3;
+    }
+    else if((meta.sttl == 254) && (meta.dttl == 252) && meta.state == STATE_ACC){
+      meta.ct_state_ttl = 4;
+    }
+    else if((meta.sttl == 254) && (meta.dttl == 252) && meta.state == STATE_CLO){
+      meta.ct_state_ttl = 5;
+    }
+    else if((meta.sttl == 254) && (meta.dttl == 0) && meta.state == STATE_REQ){
+      meta.ct_state_ttl = 7;
+    }
+    else {
       meta.ct_state_ttl = 0;
-      if ((meta.sttl == 62 || meta.sttl == 63 || meta.sttl == 254 || meta.sttl == 255)
-      && (meta.dttl == 252 || meta.dttl == 253) && meta.state == STATE_FIN) {
-              meta.ct_state_ttl = 1;
-    }
-      else if ((meta.sttl == 0 || meta.sttl == 62 || meta.sttl == 254)
-          && (meta.dttl == 0) && meta.state == STATE_INT) {
-              meta.ct_state_ttl = 2;
-    }
-      else if((meta.sttl == 62 || meta.sttl == 254)
-          && (meta.dttl == 60 || meta.dttl == 252 || meta.dttl == 253)
-          && meta.state == STATE_CON){
-                  meta.ct_state_ttl = 3;
-          }
-          else if((meta.sttl == 254) && (meta.dttl == 252) && meta.state == STATE_ACC){
-              meta.ct_state_ttl = 4;
-          }
-          else if((meta.sttl == 254) && (meta.dttl == 252) && meta.state == STATE_CLO){
-              meta.ct_state_ttl = 5;
-          }
-          else if((meta.sttl == 254) && (meta.dttl == 0) && meta.state == STATE_REQ){
-              meta.ct_state_ttl = 7;
-          }
-          else {
-  meta.ct_state_ttl = 0;
     }
   }
 
@@ -306,7 +306,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       feature = meta.feature1;
     }
     else if (f == 2) {
-        feature = meta.feature2;
+      feature = meta.feature2;
     }
     else if (f==3){
       feature = meta.feature3;
