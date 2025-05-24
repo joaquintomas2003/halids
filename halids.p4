@@ -3,6 +3,7 @@
 #include <v1model.p4>
 
 const bit<16> TYPE_IPV4 = 0x800;
+#define FLOW_TIMEOUT 15000000 //15 seconds
 #define CLASS_NOT_SET 10000// A big number
 #define MAX_REGISTER_ENTRIES 8192
 
@@ -78,9 +79,20 @@ struct metadata {
   bit<32> register_index;
   bit<32> register_index_inverse;
 
+  bit<32> srcip;
+  bit<16> srcport;
+  bit<16> dstport;
+  bit<16> hdr_srcport;
+  bit<16> hdr_dstport;
   bit<8> sttl;
   bit<8> dttl;
+
   bit<32> dpkts;
+  bit<48> time_last_pkt;
+  bit<48> time_first_pkt;
+
+  bit<1> is_first;
+  bit<1> is_hash_collision;
 }
 
 struct headers {
@@ -146,10 +158,23 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
   register<bit<8>>(MAX_REGISTER_ENTRIES) reg_ttl;
   register<bit<8>>(MAX_REGISTER_ENTRIES) reg_dttl;
+
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_dpkts;
+
+  //Registers for identifying the flow more apart from hash we may use source port
+  register<bit<32>>(max_register_entries) reg_srcip;
+  register<bit<16>>(max_register_entries) reg_srcport;
+  register<bit<16>>(max_register_entries) reg_dstport;
+
+  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_last_pkt;
+  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
 
   action init_register() {
     //intialise the registers to 0
+    reg_time_last_pkt.write(meta.register_index, 0);
+    reg_srcip.write(meta.register_index, 0);
+    reg_srcport.write(meta.register_index, 0);
+    reg_dstport.write(meta.register_index, 0);
     reg_ttl.write(meta.register_index, 0);
     reg_dttl.write(meta.register_index, 0);
     reg_dpkts.write(meta.register_index, 0);
@@ -301,53 +326,152 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     direction.apply();
     meta.class = CLASS_NOT_SET;
 
+    //TODO: if (hdr.packet_out.isValid()) meant for packets from controller
+
     if (hdr.ipv4.isValid()) {
-      if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6 || hdr.ipv4.protocol == 17) {//We treat only TCP or UDP packets
+      if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6 || hdr.ipv4.protocol == 17) {//We treat only TCP or UDP packets (and ICMP for testing)
         if (meta.direction == 1) {
           if (hdr.ipv4.protocol == 6) {
               get_register_index_tcp();
+              meta.hdr_srcport = hdr.tcp.srcPort;
+              meta.hdr_dstport = hdr.tcp.dstPort;
           }
           else {
               get_register_index_udp();
+              meta.hdr_srcport = hdr.udp.srcPort;
+              meta.hdr_dstport = hdr.udp.dstPort;
           }
 
-          meta.sttl = hdr.ipv4.ttl;
-          reg_ttl.write((bit<32>)meta.register_index, meta.sttl);
+          //read_reg_to_check_collision srcip, srcport, dstport
+          reg_srcip.read(meta.srcip, meta.register_index);
+          reg_srcport.read(meta.srcport, meta.register_index);
+          reg_dstport.read(meta.dstport, meta.register_index);
+          reg_time_last_pkt.read(meta.time_last_pkt, (bit<32>)meta.register_index);
 
-          reg_dttl.read(meta.dttl, (bit<32>)meta.register_index);
+          if (meta.srcip == 0) {//It was an empty register
+              meta.is_first = 1;
+          }
+          else if ((standard_metadata.ingress_global_timestamp - meta.time_last_pkt) > FLOW_TIMEOUT) {
+              /*We havent heard from this flow it has been FLOW_TIMEOUT
+              We will initialse the register space
+              TODO check if init_register() is initialising all and only those needed. ;
+              */
+              init_register();
+              meta.is_first = 1;
+          }
+          else if (meta.srcip != hdr.ipv4.srcAddr || meta.srcport != meta.hdr_srcport
+          || meta.dstport != meta.hdr_dstport) {
+              //Hash collision!
+              //TODO handle hash collisions in a better way!
+              meta.is_hash_collision = 1;
+          }
+
+          if (meta.is_hash_collision == 0) {
+              if (meta.is_first == 1) {
+                  meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
+                  reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
+                  reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.srcAddr);
+                  reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
+                  reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
+              }
+
+              meta.sttl = hdr.ipv4.ttl;
+              reg_ttl.write((bit<32>)meta.register_index, meta.sttl);
+
+              reg_dttl.read(meta.dttl, (bit<32>)meta.register_index);
+
+              // tcprtt
+              //SYN TIME
+              //TODO: if-else calculo tcprtt
+
+              //read all reverse flow features
+              reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
+          }//hash collision check
         }//end of direction = 1
 
         else {//direction = 0
           if (hdr.ipv4.protocol == 6) {
               get_register_index_inverse_tcp();
+              meta.hdr_srcport = hdr.tcp.dstPort;//its inverse
+              meta.hdr_dstport = hdr.tcp.srcPort;
           }
           else {
               get_register_index_inverse_udp();
+              meta.hdr_srcport = hdr.udp.dstPort;
+              meta.hdr_dstport = hdr.udp.srcPort;
           }
 
           meta.register_index = meta.register_index_inverse;
 
-          reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
-          meta.dpkts = meta.dpkts + 1;
-          reg_dpkts.write((bit<32>)meta.register_index, meta.dpkts);
+          //read_reg_to_check_collision srcip, srcport, dstport
+          reg_srcip.read(meta.srcip, meta.register_index);
+          reg_srcport.read(meta.srcport, meta.register_index);
+          reg_dstport.read(meta.dstport, meta.register_index);
+          reg_time_last_pkt.read(meta.time_last_pkt, (bit<32>)meta.register_index);
+          if (meta.srcip == 0) {//It was an empty register
+              meta.is_first = 1;
+          }
+          else if ((standard_metadata.ingress_global_timestamp - meta.time_last_pkt) > FLOW_TIMEOUT) {
+              /*We havent heard from this flow it has been FLOW_TIMEOUT
+              We will initialse the register space
+              TODO check if init_register() is initialising all and only those needed. ;
+              */
+              init_register();
+              meta.is_first = 1;
+          }
+          else if (meta.srcip != hdr.ipv4.dstAddr || meta.srcport != meta.hdr_srcport
+          || meta.dstport != meta.hdr_dstport) {
+              //Hash collision!
+              //TODO handle hash collisions in a better way!
+              meta.is_hash_collision = 1;
+          }
 
-          meta.dttl =  hdr.ipv4.ttl;
-          reg_dttl.write((bit<32>)meta.register_index, meta.dttl);
-          reg_ttl.read(meta.sttl, (bit<32>)meta.register_index);
+          if (meta.is_hash_collision == 0) {
+              if (meta.is_first == 1) {//shouldn't happen!
+                  meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
+                  reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
+                  reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.dstAddr);
+                  reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
+                  reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
+
+              }
+
+              reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
+              meta.dpkts = meta.dpkts + 1;
+              reg_dpkts.write((bit<32>)meta.register_index, meta.dpkts);
+
+                  reg_time_last_pkt.write((bit<32>)meta.register_index,
+                      standard_metadata.ingress_global_timestamp );
+
+              meta.dttl =  hdr.ipv4.ttl;
+              reg_dttl.write((bit<32>)meta.register_index, meta.dttl);
+              reg_ttl.read(meta.sttl, (bit<32>)meta.register_index);
+          }//hash collision check
         }
 
-        init_features();
+        if (meta.is_hash_collision == 0) {
+            reg_time_first_pkt.read(meta.time_first_pkt, (bit<32>)meta.register_index);
 
-        // start with parent node of decision tree
-        meta.node_id = 0;
-        meta.prevFeature = 0;
-        meta.isTrue = 1;
+            reg_time_last_pkt.write((bit<32>)meta.register_index,
+                        standard_metadata.ingress_global_timestamp );
 
-        level1.apply();
-        if (meta.class == CLASS_NOT_SET) {
-          level2.apply();
-        } // level2
-      }
+
+            init_features();
+
+            //start with parent node of decision tree
+            meta.node_id = 0;
+            meta.prevFeature = 0;
+            meta.isTrue = 1;
+
+            //TODO if malware
+
+            level1.apply();
+            if (meta.class == CLASS_NOT_SET) {
+              level2.apply();
+            } // level2
+    }//hash collision check
+
+    }
 
       ipv4_exact.apply();
     }
