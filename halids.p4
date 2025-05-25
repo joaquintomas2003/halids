@@ -387,7 +387,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   }
 
   apply {
-    direction.apply();
+    //direction.apply();
+    meta.direction = 1;
     meta.class = CLASS_NOT_SET;
     counter_pkts.count(0);
 
