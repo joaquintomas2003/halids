@@ -1,22 +1,30 @@
 from scapy.all import sniff, sendp, Ether, IP
 import argparse
 
+MTU = 1500
+
 def echo_packet(packet):
     if Ether in packet:
-        ether = packet[Ether]
-        # Swap source and destination MAC
-        ether.src, ether.dst = ether.dst, ether.src
-
+        eth = packet[Ether]
         if IP in packet:
             ip = packet[IP]
-            # Swap source and destination IP
-            ip.src, ip.dst = ip.dst, ip.src
-            print(f"Echoing IP packet: {ip.src} -> {ip.dst}")
-        else:
-            print("Echoing non-IP Ethernet frame.")
 
-        # Send the modified packet back
-        sendp(ether / packet.payload, iface=args.interface, verbose=False)
+            # Build new layers by reversing src/dst
+            ether = Ether(src=eth.dst, dst=eth.src)
+            ip_layer = IP(src=ip.dst, dst=ip.src)
+            payload = bytes(ip.payload)
+
+            total_len = len(ether) + len(ip_layer) + len(payload)
+
+            if total_len > MTU:
+                print(f"Skipping oversized packet: {total_len} bytes")
+                return
+
+            response = ether / ip_layer / payload
+            print(f"Echoing IP packet: {ip.src} -> {ip.dst} (size {total_len})")
+            sendp(response, iface=args.interface, verbose=False)
+        else:
+            print("Non-IP packet, not echoed.")
 
 def main():
     parser = argparse.ArgumentParser(description="Echo Server")
