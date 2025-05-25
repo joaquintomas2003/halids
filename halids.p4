@@ -511,10 +511,16 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }//hash collision check
       }
 
-      if(meta.isTrue == 0) counter_malware.count(0);
-      else counter_malware.count(1);
+      if(meta.class == 0) {
+        standard_metadata.egress_spec = 771;
+        counter_malware.count(0);
+      }
+      else {
+        standard_metadata.egress_spec = 770;
+        counter_malware.count(1);
+      }
 
-      ipv4_exact.apply();
+      //ipv4_exact.apply();
     }
   }
 }
