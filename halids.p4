@@ -512,13 +512,18 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }//hash collision check
       }
 
-      if(meta.class == 0) {
-        standard_metadata.egress_spec = 771;
+      if(standard_metadata.ingress_port == 770) { // traffic from vf0_2
+        mark_to_drop();
         counter_malware.count(0);
+        standard_metadata.egress_spec = 0;
       }
       else {
-        standard_metadata.egress_spec = 770;
-        counter_malware.count(1);
+        if(meta.class == 0) { // malware
+          standard_metadata.egress_spec = 771; // vf0_3
+        }
+        else { // not malware
+          standard_metadata.egress_spec = 770; // vf0_2
+        }
       }
 
       //ipv4_exact.apply();
