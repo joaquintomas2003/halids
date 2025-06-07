@@ -10,7 +10,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.feature_selection import SelectFromModel
 import csv
-from train_sw import TrainSwitch
 import subprocess
 import sys
 
