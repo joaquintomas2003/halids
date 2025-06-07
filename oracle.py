@@ -1,4 +1,18 @@
 from scapy.all import sniff, Raw
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import sklearn as sk
+from sklearn import preprocessing
+from sklearn import tree
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.feature_selection import SelectFromModel
+import csv
+from train_sw import TrainSwitch
+import subprocess
+import sys
 
 class Oracle():
     CPU_PORT = 510
