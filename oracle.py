@@ -13,6 +13,8 @@ import csv
 import subprocess
 import sys
 
+csv_file_name_for_retrain = "predicted_labels_oracle.csv"
+
 class Oracle():
     CPU_PORT = 510
     received_packets = 0
