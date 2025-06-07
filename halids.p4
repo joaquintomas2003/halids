@@ -322,6 +322,37 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.node_id = node_id;
   }
 
+  action send_to_oracle(){
+      // header to send packet to controller
+      hdr.packet_in.setValid();
+      // set egress port to CPU PORT
+      standard_metadata.egress_spec = CPU_PORT;
+      hdr.packet_in.packet_type = ControllerPacketType_t.PACKET_IN; // metadata id 1
+      hdr.packet_in.opcode = ControllerOpcode_t.SEND_FEATURES; // id 2
+      // features to send to the controller
+      hdr.packet_in.flow_hash = meta.register_index; // id 3
+      hdr.packet_in.features.feature1 = meta.feature1; // id 4
+      hdr.packet_in.features.feature2 = meta.feature2;
+      hdr.packet_in.features.feature3 = meta.feature3;
+      hdr.packet_in.features.feature4 = meta.feature4;
+      hdr.packet_in.features.feature5 = meta.feature5;
+      hdr.packet_in.features.feature6 = meta.feature6;
+      hdr.packet_in.features.feature7 = meta.feature7;
+      hdr.packet_in.features.feature8 = meta.feature8;
+      hdr.packet_in.features.feature9 = meta.feature9;
+      hdr.packet_in.features.feature10 = meta.feature10;
+      hdr.packet_in.features.feature11 = meta.feature11;
+      hdr.packet_in.features.feature12 = meta.feature12;  // id 15
+      // needed to calculate some features at the oracle (in the data plane the treshold is changed)
+      hdr.packet_in.dur = (bit<64>)meta.dur;  // id 16
+      hdr.packet_in.sbytes = (bit<64>)meta.sbytes; // id 17
+      hdr.packet_in.dpkts = (bit<64>)meta.dpkts;  // id 18
+      hdr.packet_in.spkts = (bit<64>)meta.spkts;  // id 19
+      hdr.packet_in.malware = meta.malware; // send priori knowledge of malware
+      hdr.packet_in.is_first = meta.is_first; 
+      hdr.packet_in.reserved = 0;
+  }
+
   action SetClass(bit<16> node_id, bit<16> class) {
     meta.class = class;
     meta.node_id = node_id;
@@ -511,16 +542,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           } // level2
         }//hash collision check
       }
-
-      if(meta.class == 0) {
-        standard_metadata.egress_spec = 771;
-        counter_malware.count(0);
-      }
-      else {
-        standard_metadata.egress_spec = 770;
-        counter_malware.count(1);
-      }
-
+      send_to_oracle();
       //ipv4_exact.apply();
     }
   }
