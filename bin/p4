@@ -91,7 +91,7 @@ case "$COMMAND" in
     echo "Commands:"
     echo "  build <file.p4>                        Compile the given P4 program (output in ./out/)"
     echo "  design-load                            Load compiled firmware from ./out/"
-    echo "  config-load <config file>              Reload config from ./user_config.json"
+    echo "  config-load <config file>              Reload config from <config file>"
     echo "  list-tables                            Show all the tables"
     echo "  list-table <table id>                  Show the given table"
     echo "  nfp4build **                           nfp4build passthrough command"
