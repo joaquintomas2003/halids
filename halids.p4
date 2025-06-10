@@ -363,23 +363,23 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
     hdr.features.feature1 = meta.feature1;
     hdr.features.feature2 = meta.feature2;
-    hdr.features.feature3 = meta.feature3;
-    hdr.features.feature4 = meta.feature4;
-    hdr.features.feature5 = meta.feature5;
-    hdr.features.feature6 = meta.feature6;
-    hdr.features.feature7 = meta.feature7;
-    hdr.features.feature8 = meta.feature8;
-    hdr.features.feature9 = meta.feature9;
-    hdr.features.feature10 = meta.feature10;
-    hdr.features.feature11 = meta.feature11;
-    hdr.features.feature12 = meta.feature12;
+    //hdr.features.feature3 = meta.feature3;
+    //hdr.features.feature4 = meta.feature4;
+    //hdr.features.feature5 = meta.feature5;
+    //hdr.features.feature6 = meta.feature6;
+    //hdr.features.feature7 = meta.feature7;
+    //hdr.features.feature8 = meta.feature8;
+    //hdr.features.feature9 = meta.feature9;
+    //hdr.features.feature10 = meta.feature10;
+    //hdr.features.feature11 = meta.feature11;
+    //hdr.features.feature12 = meta.feature12;
 
-    hdr.features.dur     = (bit<32>)meta.dur;
-    hdr.features.sbytes  = (bit<32>)meta.sbytes;
-    hdr.features.dpkts   = (bit<32>)meta.dpkts;
-    hdr.features.spkts   = (bit<32>)meta.spkts;
-    hdr.features.malware = meta.malware;
-    hdr.features.is_first = meta.is_first;
+//    hdr.features.dur     = (bit<32>)meta.dur;
+    //hdr.features.sbytes  = (bit<32>)meta.sbytes;
+    //hdr.features.dpkts   = (bit<32>)meta.dpkts;
+    //hdr.features.spkts   = (bit<32>)meta.spkts;
+    //hdr.features.malware = meta.malware;
+    //hdr.features.is_first = meta.is_first;
 
     standard_metadata.egress_spec = CPU_PORT;
   }
