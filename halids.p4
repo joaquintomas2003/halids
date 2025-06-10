@@ -14,6 +14,11 @@ const bit<16> TYPE_IPV4 = 0x800;
 #define STATE_CLO 6
 #define STATE_EST 7
 
+#define THRESHOLD_CERTAINTY 80
+#define SEND_TO_ORACLE 2
+
+#define CPU_PORT 768
+
 /*************************************************************************
  *********************** H E A D E R S  ***********************************
  *************************************************************************/
@@ -322,9 +327,18 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.node_id = node_id;
   }
 
-  action SetClass(bit<16> node_id, bit<16> class) {
-    meta.class = class;
+  action send_to_oracle(){
+    standard_metadata.egress_spec = CPU_PORT;
+  }
+
+  action SetClass(bit<16> node_id, bit<16> class, bit<8> certainty) {
     meta.node_id = node_id;
+    if (certainty > THRESHOLD_CERTAINTY) {
+      meta.class = class;
+    }
+    else {
+      meta.class = SEND_TO_ORACLE;
+    }
   }
 
   action SetDirection() {
@@ -561,16 +575,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           }
         }//hash collision check
       }
-
-      if(meta.class == 0) {
-        standard_metadata.egress_spec = 771;
-        counter_malware.count(0);
-      }
-      else {
-        standard_metadata.egress_spec = 770;
-        counter_malware.count(1);
-      }
-
+      send_to_oracle();
       //ipv4_exact.apply();
     }
   }
