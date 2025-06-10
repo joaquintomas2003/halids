@@ -2,3 +2,4 @@ pifout/
 out/
 Makefile-nfp4build
 datos_limpios.csv
+__pycache__/

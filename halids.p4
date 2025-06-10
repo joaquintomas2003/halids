@@ -76,11 +76,40 @@ header udp_t {
   bit<16> checksum;
 }
 
+header features_t {
+    bit<32> feature1;
+    bit<32> feature2;
+    bit<32> feature3;
+    bit<32> feature4;
+    bit<32> feature5;
+    bit<32> feature6;
+    bit<32> feature7;
+    bit<32> feature8;
+    bit<32> feature9;
+    bit<32> feature10;
+    bit<32> feature11;
+    bit<32> feature12;
+    bit<32> dur;
+    bit<32> sbytes;
+    bit<32> dpkts;
+    bit<32> spkts;
+    bit<32> malware;
+    bit<32> is_first;
+}
+
 struct metadata {
   bit<64> feature1;
   bit<64> feature2;
   bit<64> feature3;
+  bit<64> feature4;
   bit<64> feature5;
+  bit<64> feature6;
+  bit<64> feature7;
+  bit<64> feature8;
+  bit<64> feature9;
+  bit<64> feature10;
+  bit<64> feature11;
+  bit<64> feature12;
 
   bit<16> prevFeature;
   bit<16> isTrue;
@@ -114,6 +143,7 @@ struct headers {
   ipv4_t       ipv4;
   tcp_t        tcp;
   udp_t        udp;
+  features_t   features;
 }
 
 /*************************************************************************
@@ -327,7 +357,29 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.node_id = node_id;
   }
 
-  action send_to_oracle(){
+  action send_to_oracle() {
+    hdr.features.setValid();
+
+    hdr.features.feature1 = meta.feature1;
+    hdr.features.feature2 = meta.feature2;
+    hdr.features.feature3 = meta.feature3;
+    hdr.features.feature4 = meta.feature4;
+    hdr.features.feature5 = meta.feature5;
+    hdr.features.feature6 = meta.feature6;
+    hdr.features.feature7 = meta.feature7;
+    hdr.features.feature8 = meta.feature8;
+    hdr.features.feature9 = meta.feature9;
+    hdr.features.feature10 = meta.feature10;
+    hdr.features.feature11 = meta.feature11;
+    hdr.features.feature12 = meta.feature12;
+
+    hdr.features.dur     = (bit<32>)meta.dur;
+    hdr.features.sbytes  = (bit<32>)meta.sbytes;
+    hdr.features.dpkts   = (bit<32>)meta.dpkts;
+    hdr.features.spkts   = (bit<32>)meta.spkts;
+    hdr.features.malware = meta.malware;
+    hdr.features.is_first = meta.is_first;
+
     standard_metadata.egress_spec = CPU_PORT;
   }
 

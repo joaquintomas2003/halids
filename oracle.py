@@ -119,5 +119,127 @@ class Oracle():
         subprocess.call(['sh', './add_entries.sh'])
         print("Switch trained - rules loaded")
 
+    def predict_label(self, pkt):
+        Oracle.received_packets = Oracle.received_packets + 1
+        print("received packets:", Oracle.received_packets)
+        # extra data needed to calculate features
+        metadata_temp = pkt.packet.metadata[15]
+        dur_value = int.from_bytes(metadata_temp.value, byteorder="big")
+        metadata_temp = pkt.packet.metadata[16]
+        sbytes_value = int.from_bytes(metadata_temp.value, byteorder="big")
+        metadata_temp = pkt.packet.metadata[17]
+        dpkts_value = int.from_bytes(metadata_temp.value, byteorder="big")
+        metadata_temp = pkt.packet.metadata[18]
+        spkts_value = int.from_bytes(metadata_temp.value, byteorder="big")
+        # extract features from received packet
+        features_fit = [0] * 12
+        features_train = [0] * 12
+        max_int = sys.maxsize
+        for metadata in pkt.packet.metadata:
+            if (metadata.metadata_id == 3):
+                # metadata with flow hash
+                flow_hash = int.from_bytes(metadata.value, byteorder="big")
+                flow_hash = str(flow_hash)
+            feature_id = metadata.metadata_id - 4
+            if (feature_id>-1 and feature_id<12): 
+                # save received features
+                orig_value = int.from_bytes(metadata.value, byteorder="big")
+                retrain_value = orig_value
+                if feature_id == 3: # id = 4 (sload feature)
+                    if(dur_value == 0 or sbytes_value == 0):
+                        if (orig_value != 0):
+                            orig_value = max_int # make it bigger than the threshold
+                            retrain_value = self.max_sload
+                    else:
+                        orig_value = orig_value * 1000000
+                        orig_value = orig_value / (dur_value*sbytes_value)
+                        retrain_value = orig_value
+                if feature_id == 5: # id = 6 (dmeansz feature)
+                    if(dpkts_value == 0):
+                        if (orig_value != 0):
+                            orig_value = max_int # make it bigger than the threshold
+                            retrain_value = self.max_dmeansz
+                    else:
+                        orig_value = orig_value / dpkts_value
+                        retrain_value = orig_value
+                if feature_id == 7: # id = 8 (dload feature)
+                    if(dur_value == 0 or sbytes_value == 0):
+                        if (orig_value != 0):
+                            orig_value = max_int # make it bigger than the threshold
+                            retrain_value = self.max_dload
+                    else:
+                        orig_value = orig_value * 1000000
+                        orig_value = orig_value / (dur_value*sbytes_value)
+                        retrain_value = orig_value
+                if feature_id == 8: # id = 9 (smeansz feature)
+                    if(spkts_value == 0):
+                        if (orig_value != 0):
+                            orig_value = max_int # make it bigger than the threshold
+                            retrain_value = self.max_smeansz
+                    else:
+                        orig_value = orig_value / spkts_value
+                        retrain_value = orig_value
+                if feature_id == 9 or feature_id == 11: # id = 10 (tcprrt) id = 12 (dur)
+                    orig_value = orig_value / int(1000000.0)
+                    retrain_value = orig_value
+                features_fit[feature_id] = orig_value
+                features_train[feature_id] = retrain_value
+        self.packetOut.payload = pkt.packet.payload
+        self.packetOut.metadata["packet_type"] = Oracle.PACKET_OUT
+        self.packetOut.metadata["opcode"] = Oracle.RCV_LABEL
+        self.packetOut.metadata["flow_hash"] = flow_hash
+        predicted_label = self.rf.predict([features_fit])
+        self.packetOut.metadata["label"] = str(predicted_label[0])
+        malware_temp = pkt.packet.metadata[19]
+        malware = int.from_bytes(malware_temp.value, byteorder="big")
+        self.packetOut.metadata["malware"] = str(malware)
+        is_first_temp = pkt.packet.metadata[20]
+        is_first = int.from_bytes(is_first_temp.value, byteorder="big")
+        self.packetOut.metadata["is_first"] = str(is_first)
+        self.packetOut.metadata["reserved"] = '0'
+        self.packetOut.send()
+        # every time the oracle predicts a label, we save it
+        with open('predicted_labels_oracle.csv', 'a') as save_labels_for_retrain:
+            writer = csv.writer(save_labels_for_retrain)
+            row = [0] * 13
+            # features from received pkt - with modifications/approximations
+            for i in range(12):
+                row[i] = features_train[i]
+            # label predicted for pkt
+            row[12] = str(predicted_label[0])
+            # save decision in csv
+            writer.writerow(row) 
+        # erase csv and retrain
+        # change number of packets for retrain
+        packets_retrain = 100000000000000000000
+        if (Oracle.received_packets > packets_retrain):
+            Oracle.cant_retrain = Oracle.cant_retrain + 1
+            self.train_sw.retrain()
+            # if new max appears at retrain, save it 
+            if (self.max_sload < self.train_sw.max_sload):
+                self.max_sload = self.train_sw.max_sload
+            if (self.max_dmeansz < self.train_sw.max_dmeansz):
+                self.max_dmeansz = self.train_sw.max_dmeansz
+            if (self.max_dload < self.train_sw.max_dload):
+                self.max_dload = self.train_sw.max_dload
+            if (self.max_smeansz < self.train_sw.max_smeansz):
+                self.max_smeansz = self.train_sw.max_smeansz
+            subprocess.call(['sh', './add_entries.sh'])
+            print("Switch retrained for", Oracle.cant_retrain, "time")
+            Oracle.received_packets = 0
+            # uncomment this to erase the saved labels 
+            # with open(csv_file_name_for_retrain, "w") as save_labels_for_retrain:
+            #     # erase csv
+            #     save_labels_for_retrain.truncate()
+            #     writer = csv.writer(save_labels_for_retrain)
+            #     writer.writerow(['sttl', 'ct_state_ttl', 'dttl', 'Sload', 'Dpkts', 'dmeansz', 'sbytes', 'Dload', 'smeansz', 'tcprtt', 'dsport', 'dur', 'Label']) 
+            
+            # uncomment this to replace rows from the saved labels
+            # erasing first X rows - "replacing" them with oracle decisions
+            df = pd.read_csv(csv_file_name_for_retrain)
+            for i in range(0,4999):
+                df = df.drop(i)
+            df.to_csv(csv_file_name_for_retrain, index=False)
+
 oracle = Oracle()
 oracle.setUp()
