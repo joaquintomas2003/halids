@@ -76,7 +76,7 @@ header udp_t {
   bit<16> checksum;
 }
 
-header Features_t {
+header features_t {
     bit<64> feature1;
     bit<64> feature2;
     bit<64> feature3;
