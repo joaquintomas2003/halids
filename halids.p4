@@ -363,9 +363,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
     hdr.features.feature1 = meta.feature1;
     hdr.features.feature2 = meta.feature2;
-    //hdr.features.feature3 = meta.feature3;
+    hdr.features.feature3 = meta.feature3;
     //hdr.features.feature4 = meta.feature4;
-    //hdr.features.feature5 = meta.feature5;
+    hdr.features.feature5 = meta.feature5;
     //hdr.features.feature6 = meta.feature6;
     //hdr.features.feature7 = meta.feature7;
     //hdr.features.feature8 = meta.feature8;
