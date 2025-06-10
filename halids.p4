@@ -76,25 +76,26 @@ header udp_t {
   bit<16> checksum;
 }
 
-header features_t {
-    bit<32> feature1;
-    bit<32> feature2;
-    bit<32> feature3;
-    bit<32> feature4;
-    bit<32> feature5;
-    bit<32> feature6;
-    bit<32> feature7;
-    bit<32> feature8;
-    bit<32> feature9;
-    bit<32> feature10;
-    bit<32> feature11;
-    bit<32> feature12;
-    bit<32> dur;
-    bit<32> sbytes;
-    bit<32> dpkts;
-    bit<32> spkts;
-    bit<32> malware;
-    bit<32> is_first;
+header Features_t {
+    bit<64> feature1;
+    bit<64> feature2;
+    bit<64> feature3;
+    bit<64> feature4;
+    bit<64> feature5;
+    bit<64> feature6;
+    bit<64> feature7;
+    bit<64> feature8;
+    bit<64> feature9;
+    bit<64> feature10;
+    bit<64> feature11;
+    bit<64> feature12;
+    bit<64> dur;
+    bit<64> sbytes;
+    bit<64> dpkts;
+    bit<64> spkts;
+    bit<1>  malware;
+    bit<1>  is_first;
+    bit<62> padding;  // xa hacerlo múltiplo de 8 bytes
 }
 
 struct metadata {
