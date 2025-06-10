@@ -576,19 +576,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
                 level4.apply();
                 if (meta.class == CLASS_NOT_SET) {
                   level5.apply();
-                  // if (meta.class == CLASS_NOT_SET) {
-                  //     level6.apply();
-                  //     if (meta.class == CLASS_NOT_SET) {
-                  //     level7.apply();
-                  //     if (meta.class == CLASS_NOT_SET) {
-                  //     level8.apply();
-                  //     if (meta.class == CLASS_NOT_SET) {
-                  //     level9.apply();
-                  //     if (meta.class == CLASS_NOT_SET) {
-                  //         level10.apply();
-                  //             if (meta.class == CLASS_NOT_SET)
-                  //         level11.apply();
-                  // }}}}}
                 }
               }
             }
