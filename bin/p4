@@ -25,7 +25,18 @@ case "$COMMAND" in
       exit 1
     fi
 
-    echo "Compiling $P4_FILE..."
+    if [ -n "$1" ]; then
+      C_FILE="$1"
+      if [ ! -f "$C_FILE" ]; then
+        echo "❌ C file not found: $C_FILE"
+        exit 1
+      fi
+      C_FLAG="-c $C_FILE"
+    else
+      C_FLAG=""
+    fi
+
+    echo "Compiling $P4_FILE${C_FILE:+ with $C_FILE}..."
     /opt/netronome/p4/bin/nfp4build \
       --nfp4c_p4_version 16 \
       --no-debug-info \
@@ -33,7 +44,8 @@ case "$COMMAND" in
       -o "$FIRMWARE_PATH" \
       -l lithium \
       --shared-codestore \
-      -4 "$P4_FILE"
+      -4 "$P4_FILE" \
+      $C_FLAG
     echo "✅ Compilation complete: $FIRMWARE_PATH"
     ;;
 
