@@ -25,15 +25,31 @@ case "$COMMAND" in
       exit 1
     fi
 
-    if [ -n "$1" ]; then
-      C_FILE="$1"
-      if [ ! -f "$C_FILE" ]; then
-        echo "❌ C file not found: $C_FILE"
-        exit 1
-      fi
-      C_FLAG="-c $C_FILE"
-    else
-      C_FLAG=""
+    echo "Compiling $P4_FILE${C_FILE:+ with $C_FILE}..."
+    /opt/netronome/p4/bin/nfp4build \
+      --nfp4c_p4_version 16 \
+      --no-debug-info \
+      -p pifout \
+      -o "$FIRMWARE_PATH" \
+      -l lithium \
+      --shared-codestore \
+      -4 "$P4_FILE" \
+      --nfirc_mac_ingress_timestamp
+    echo "✅ Compilation complete: $FIRMWARE_PATH"
+    ;;
+
+  buildc)
+    if [ -z "$1" ]; then
+      echo "❌ Please specify the .p4 file to compile."
+      echo "Usage: bin/p4 build path/to/your_file.p4"
+      exit 1
+    fi
+
+    P4_FILE="$1"
+
+    if [ ! -f "$P4_FILE" ]; then
+      echo "❌ File not found: $P4_FILE"
+      exit 1
     fi
 
     echo "Compiling $P4_FILE${C_FILE:+ with $C_FILE}..."
@@ -45,7 +61,8 @@ case "$COMMAND" in
       -l lithium \
       --shared-codestore \
       -4 "$P4_FILE" \
-      $C_FLAG
+      $C_FLAG \
+      -c main.c
     echo "✅ Compilation complete: $FIRMWARE_PATH"
     ;;
 
@@ -102,6 +119,7 @@ case "$COMMAND" in
     echo ""
     echo "Commands:"
     echo "  build <file.p4>                        Compile the given P4 program (output in ./out/)"
+    echo "  build <file.p4>                        Compile the given P4 program with main.c (output in ./out/)"
     echo "  design-load                            Load compiled firmware from ./out/"
     echo "  config-load <config file>              Reload config from <config file>"
     echo "  list-tables                            Show all the tables"
