@@ -33,7 +33,7 @@ set -e
 /opt/netronome/p4/bin/rtecli tables add \
   --table-name ingress::direction \
   --rule set_direction_to_inside \
-  --match '{"ipv4.dstAddr": {"value": "10.0.0.0/24"}}' \
+  --match '{"ipv4.dstAddr": {"value": "149.171.126.0/24"}}' \
   --action '{"type": "ingress::SetDirection"}'
 
 echo "All tables loaded successfully!"

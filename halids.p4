@@ -176,9 +176,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<16>>(MAX_REGISTER_ENTRIES) reg_dstport;
 
   //Store some statistics for the experiment
-  counter(1, CounterType.packets) counter_pkts;
+  counter(2, CounterType.packets) counter_direction;
   counter(2, CounterType.packets) counter_malware;
-  counter(1, CounterType.packets) counter_pkts_ip;
 
   action init_register() {
     //intialise the registers to 0
@@ -387,15 +386,19 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   }
 
   apply {
-    //direction.apply();
-    meta.direction = 1;
+    direction.apply();
+
+    if (meta.direction == 0) {
+      counter_direction.count(0);
+    } else {
+      counter_direction.count(1);
+    };
+
     meta.class = CLASS_NOT_SET;
-    counter_pkts.count(0);
 
     //TODO: if (hdr.packet_out.isValid()) meant for packets from controller
 
     if (hdr.ipv4.isValid()) {
-      counter_pkts_ip.count(0);
 
       if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6 || hdr.ipv4.protocol == 17) {//We treat only TCP or UDP packets (and ICMP for testing)
         if (meta.direction == 1) {
@@ -515,13 +518,12 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       if(meta.class == 0) {
         standard_metadata.egress_spec = 771;
         counter_malware.count(0);
-      }
-      else {
+      } else {
         standard_metadata.egress_spec = 770;
         counter_malware.count(1);
       }
 
-      //ipv4_exact.apply();
+      ipv4_exact.apply();
     }
   }
 }
