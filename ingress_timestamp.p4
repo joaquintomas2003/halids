@@ -11,7 +11,7 @@ typedef bit<16> egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 
-extern void populate_if_ts();
+extern void set_ingress_timestamp();
 
 header ethernet_t {
   macAddr_t dstAddr;
@@ -117,7 +117,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   apply {
     counter_pkts.count(0);
 
-    populate_if_ts();
+    set_ingress_timestamp();
+
+    hdr.ethernet.srcAddr = (bit<48>) standard_metadata.ingress_global_timestamp;
 
     standard_metadata.egress_spec = 768;
   }
