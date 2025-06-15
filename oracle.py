@@ -14,7 +14,10 @@ import subprocess
 import sys
 from train_sw import TrainSwitch
 
-csv_file_name_for_retrain = "predicted_labels_oracle.csv"
+csv_file_name_for_retrain = "ml_data/predicted_labels_oracle.csv"
+
+def get_u64(payload, offset):
+    return int.from_bytes(payload[offset:offset+8], byteorder="big")
 
 class Oracle():
     CPU_PORT = 510
@@ -32,7 +35,7 @@ class Oracle():
         ############# TRAIN THE ORACLE ##############
         #############################################
 
-        data_train = pd.read_csv('datos_limpios.csv')
+        data_train = pd.read_csv('ml_data/datos_limpios.csv')
         data_train.shape
 
         #Separate labels/ground truth
@@ -119,5 +122,104 @@ class Oracle():
         subprocess.call(['sh', './add_entries.sh'])
         print("Switch trained - rules loaded")
 
+    def predict_label(self, pkt):
+        Oracle.received_packets += 1
+        print(f"Received packet #{Oracle.received_packets}")
+
+        if Raw not in pkt:
+            print("No payload found.")
+            return
+
+        payload = pkt[Raw].load
+
+        if len(payload) < 136:
+            print(f"Payload too short ({len(payload)} bytes). Expected 136.")
+            return
+
+        # TODO: Mandarlos de p4 y contrastar los valores con un print
+        dur_value = get_u64(payload, 96)
+        sbytes_value = get_u64(payload, 104)
+        dpkts_value = get_u64(payload, 112)
+        spkts_value = get_u64(payload, 120)
+
+        # Boolean flags (malware and is_first) packed in last byte
+        flag_byte = payload[135]
+        malware = (flag_byte >> 7) & 0x1  # first bit
+        is_first = (flag_byte >> 6) & 0x1  # second bit
+
+        features_fit = [0] * 12
+        features_train = [0] * 12
+        max_int = sys.maxsize
+
+        for i in range(12):
+            offset = i * 8
+            orig_value = get_u64(payload, offset)
+            retrain_value = orig_value
+
+            if i == 3:  # Sload
+                if dur_value == 0 or sbytes_value == 0:
+                    if orig_value != 0:
+                        orig_value = max_int
+                        retrain_value = self.max_sload
+                else:
+                    orig_value = orig_value * 1e6 / (dur_value * sbytes_value)
+                    retrain_value = orig_value
+            elif i == 5:  # dmeansz
+                if dpkts_value == 0:
+                    if orig_value != 0:
+                        orig_value = max_int
+                        retrain_value = self.max_dmeansz
+                else:
+                    orig_value = orig_value / dpkts_value
+                    retrain_value = orig_value
+            elif i == 7:  # Dload
+                if dur_value == 0 or sbytes_value == 0:
+                    if orig_value != 0:
+                        orig_value = max_int
+                        retrain_value = self.max_dload
+                else:
+                    orig_value = orig_value * 1e6 / (dur_value * sbytes_value)
+                    retrain_value = orig_value
+            elif i == 8:  # smeansz
+                if spkts_value == 0:
+                    if orig_value != 0:
+                        orig_value = max_int
+                        retrain_value = self.max_smeansz
+                else:
+                    orig_value = orig_value / spkts_value
+                    retrain_value = orig_value
+            elif i == 9 or i == 11:  # tcprtt, dur
+                orig_value = orig_value / 1e6
+                retrain_value = orig_value
+
+            features_fit[i] = orig_value
+            features_train[i] = retrain_value
+
+        prediction = self.rf.predict([features_fit])[0]
+        print(f"Predicted label: {prediction}, Malware: {malware}, First: {is_first}")
+
+        with open('ml_data/predicted_labels_oracle.csv', 'a') as f:
+            writer = csv.writer(f)
+            writer.writerow(features_train + [prediction])
+
+        # Retrain
+        packets_retrain = 5
+        if Oracle.received_packets > packets_retrain:
+            Oracle.cant_retrain += 1
+            self.train_sw.retrain()
+
+            # update max
+            self.max_sload = max(self.max_sload, self.train_sw.max_sload)
+            self.max_dmeansz = max(self.max_dmeansz, self.train_sw.max_dmeansz)
+            self.max_dload = max(self.max_dload, self.train_sw.max_dload)
+            self.max_smeansz = max(self.max_smeansz, self.train_sw.max_smeansz)
+
+            subprocess.call(['sh', './add_entries.sh'])
+            print(f"Switch retrained {Oracle.cant_retrain} times")
+            Oracle.received_packets = 0
+
 oracle = Oracle()
 oracle.setUp()
+
+print("Escuchando paquetes en vf0_0...")
+sniff(iface="vf0_0", prn=oracle.predict_label, store=0)

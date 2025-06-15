@@ -12,10 +12,10 @@ class ExportRulesP4():
         pass
 
     def open_files(self):
-        filename = 'final_rf_model.sav'
+        filename = 'ml_data/final_rf_model.sav'
         self.rf = pickle.load(open(filename, 'rb'))
 
-        f = open('probs_0.json')
+        f = open('ml_data/probs_0.json')
         self.probs_leafs = json.load(f)
 
         self.i_tree = 0
@@ -23,7 +23,7 @@ class ExportRulesP4():
         self.global_id = 0
 
     def export_p4(self, decision_tree):
-        f = open("rules.txt", "w")
+        f = open("ml_data/rules.txt", "w")
         tree_ = decision_tree.tree_
         class_names = decision_tree.classes_
 

@@ -30,7 +30,7 @@ class TrainSwitch():
         # - intial train of the switch
         # - generate the rules corresponding to the trained model
         #############################################
-        data_train = pd.read_csv('datos_limpios.csv')
+        data_train = pd.read_csv('ml_data/datos_limpios.csv')
         data_train.shape
 
         #Separate labels/ground truth
@@ -198,7 +198,7 @@ class TrainSwitch():
                 with open('probs_'+str(i_tree)+'.json', 'w') as filehandle:
                     json.dump(self.probs,filehandle)
             i_tree = i_tree + 1
-        filename = 'final_rf_model.sav'
+        filename = 'ml_data/final_rf_model.sav'
         pickle.dump(self.rf, open(filename, 'wb'))
 
 

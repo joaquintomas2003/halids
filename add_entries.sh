@@ -1,6 +1,6 @@
 #!/bin/sh
 
-RULES_FILE="rules.txt"
+RULES_FILE="ml_data/rules.txt"
 
 while IFS= read -r line
 do
