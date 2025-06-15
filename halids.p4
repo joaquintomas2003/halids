@@ -22,6 +22,8 @@ typedef bit<16> egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 
+extern void set_ingress_timestamp();
+
 header ethernet_t {
   macAddr_t dstAddr;
   macAddr_t srcAddr;
@@ -31,7 +33,8 @@ header ethernet_t {
 header ipv4_t {
   bit<4>    version;
   bit<4>    ihl;
-  bit<8>    diffserv;
+  bit<6>    dSField;
+  bit<2>    ecn;
   bit<16>   totalLen;
   bit<16>   identification;
   bit<3>    flags;
@@ -76,6 +79,7 @@ struct metadata {
   bit<64> feature2;
   bit<64> feature3;
   bit<64> feature5;
+  bit<64> feature12;
 
   bit<16> prevFeature;
   bit<16> isTrue;
@@ -102,6 +106,9 @@ struct metadata {
 
   bit<8> state;
   bit<8> ct_state_ttl;
+  bit<48> dur;
+
+  bit<48> time_first_pkt;
 }
 
 struct headers {
@@ -174,10 +181,10 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_srcip;
   register<bit<16>>(MAX_REGISTER_ENTRIES) reg_srcport;
   register<bit<16>>(MAX_REGISTER_ENTRIES) reg_dstport;
+  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
 
   //Store some statistics for the experiment
-  counter(2, CounterType.packets) counter_direction;
-  counter(2, CounterType.packets) counter_malware;
+  counter(10, CounterType.packets) counter;
 
   action init_register() {
     //intialise the registers to 0
@@ -294,6 +301,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.feature2 = (bit<64>)meta.ct_state_ttl;
     meta.feature3 = (bit<64>)meta.dttl;
     meta.feature5 = (bit<64>)meta.dpkts;
+    meta.feature12 = (bit<64>)meta.dur;//dur
   }
 
   action CheckFeature(bit<16> node_id, bit<16> f_inout, bit<64> threshold) {
@@ -312,6 +320,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
     else if (f==5){
       feature = meta.feature5;
+    }
+    else if (f==12){
+      feature = meta.feature12;
     }
 
     if(feature <= th) meta.isTrue = 1;
@@ -388,13 +399,15 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   apply {
     direction.apply();
 
-    if (meta.direction == 0) {
-      counter_direction.count(0);
+    if (meta.direction == 0){
+      counter.count(0);
     } else {
-      counter_direction.count(1);
+      counter.count(1);
     };
 
     meta.class = CLASS_NOT_SET;
+
+    set_ingress_timestamp();
 
     //TODO: if (hdr.packet_out.isValid()) meant for packets from controller
 
@@ -430,6 +443,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
           if (meta.is_hash_collision == 0) {
             if (meta.is_first == 1) {
+              meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
+              reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
               reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.srcAddr);
               reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
               reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
@@ -496,6 +511,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }
 
         if (meta.is_hash_collision == 0) {
+          reg_time_first_pkt.read(meta.time_first_pkt, (bit<32>)meta.register_index);
+          meta.dur = standard_metadata.ingress_global_timestamp - meta.time_first_pkt;
+
           calc_state();
           calc_ct_state_ttl();
 
@@ -517,13 +535,19 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
       if(meta.class == 0) {
         standard_metadata.egress_spec = 771;
-        counter_malware.count(0);
+        hdr.ipv4.ecn = 0;
+        counter.count(2);
       } else {
         standard_metadata.egress_spec = 770;
-        counter_malware.count(1);
+        hdr.ipv4.ecn = 1;
+        counter.count(3);
       }
 
-      ipv4_exact.apply();
+      hdr.ipv4.dstAddr = (bit<32>) standard_metadata.ingress_global_timestamp;
+      hdr.ipv4.srcAddr = (bit<32>) meta.time_first_pkt;
+      hdr.ipv4.dSField = (bit<6>) meta.dur;
+
+      //ipv4_exact.apply();
     }
   }
 }
@@ -546,7 +570,8 @@ control MyComputeChecksum(inout headers  hdr, inout metadata meta) {
         hdr.ipv4.isValid(),
         { hdr.ipv4.version,
         hdr.ipv4.ihl,
-        hdr.ipv4.diffserv,
+        hdr.ipv4.dSField,
+        hdr.ipv4.ecn,
         hdr.ipv4.totalLen,
         hdr.ipv4.identification,
         hdr.ipv4.flags,
