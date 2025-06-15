@@ -20,7 +20,7 @@ import pickle as pickle
 import csv
 from export_rules_sw import ExportRulesP4
 
-csv_file_name_for_retrain = "predicted_labels_oracle.csv"
+csv_file_name_for_retrain = "ml_data/predicted_labels_oracle.csv"
 
 class TrainSwitch():
 
@@ -124,7 +124,7 @@ class TrainSwitch():
         # - generate the rules corresponding to the trained model
         #############################################
         # TODO: retrain with different data
-        data_train = pd.read_csv('predicted_labels_oracle.csv') 
+        data_train = pd.read_csv('ml_data/predicted_labels_oracle.csv')
         data_train.shape
 
         train_label_label = np.array(data_train['Label'])
@@ -146,7 +146,7 @@ class TrainSwitch():
         # del frames
 
         #use only top features
-        data_top = data_train[['sttl', 'ct_state_ttl', 'dttl', 
+        data_top = data_train[['sttl', 'ct_state_ttl', 'dttl',
         'Sload', 'Dpkts', 'dmeansz', 'sbytes', 'Dload', 'smeansz',
         'tcprtt', 'dsport', 'dur']]
         data_train = data_top
@@ -187,7 +187,7 @@ class TrainSwitch():
     def export_rules(self):
         i_tree = 0
         for tree_in_forest in self.rf.estimators_:
-            with open('tree_' + str(i_tree) + '.dot', 'w') as my_file:
+            with open('ml_data/tree_' + str(i_tree) + '.dot', 'w') as my_file:
                 my_file = tree.export_graphviz(tree_in_forest, out_file = my_file)
                 r = export_text(tree_in_forest)
                 self.cant_hojas = tree_in_forest.get_n_leaves()
@@ -195,7 +195,7 @@ class TrainSwitch():
                 self.hojas = [0]*self.cant_hojas
                 self.leaf = 0
                 self.calc_probs(tree_in_forest)
-                with open('probs_'+str(i_tree)+'.json', 'w') as filehandle:
+                with open('ml_data/probs_'+str(i_tree)+'.json', 'w') as filehandle:
                     json.dump(self.probs,filehandle)
             i_tree = i_tree + 1
         filename = 'ml_data/final_rf_model.sav'
