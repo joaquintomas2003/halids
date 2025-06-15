@@ -649,22 +649,25 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }//hash collision check
       }
 
-      if(meta.class == 0) {
-        standard_metadata.egress_spec = 771;
-        hdr.ipv4.ecn = 0;
-        counter.count(2);
-      } else {
-        standard_metadata.egress_spec = 770;
-        hdr.ipv4.ecn = 1;
-        counter.count(3);
+      if (meta.class == SEND_TO_ORACLE){
+        send_to_oracle();
+      }else{
+        if(meta.class == 0) {
+          standard_metadata.egress_spec = 771;
+          hdr.ipv4.ecn = 0;
+          counter.count(2);
+        } else {
+          standard_metadata.egress_spec = 770;
+          hdr.ipv4.ecn = 1;
+          counter.count(3);
+        }
+
+        hdr.ipv4.dstAddr = (bit<32>) standard_metadata.ingress_global_timestamp;
+        hdr.ipv4.srcAddr = (bit<32>) meta.time_first_pkt;
+        hdr.ipv4.dSField = (bit<6>) meta.dur;
+
+        //ipv4_exact.apply();
       }
-
-      hdr.ipv4.dstAddr = (bit<32>) standard_metadata.ingress_global_timestamp;
-      hdr.ipv4.srcAddr = (bit<32>) meta.time_first_pkt;
-      hdr.ipv4.dSField = (bit<6>) meta.dur;
-
-      send_to_oracle();
-      //ipv4_exact.apply();
     }
   }
 }
