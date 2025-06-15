@@ -383,9 +383,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     hdr.features.feature11 = 0;
     hdr.features.feature12 = meta.feature12;
 
-    hdr.features.dur     = meta.dur;
+    hdr.features.dur     = (bit<64>)meta.dur;
     hdr.features.sbytes  = 0;
-    hdr.features.dpkts   = meta.dpkts;
+    hdr.features.dpkts   = (bit<64>)meta.dpkts;
     hdr.features.spkts   = 0;
     hdr.features.malware = 0;
     hdr.features.is_first = meta.is_first;
