@@ -14,6 +14,11 @@ const bit<16> TYPE_IPV4 = 0x800;
 #define STATE_CLO 6
 #define STATE_EST 7
 
+#define THRESHOLD_CERTAINTY 80
+#define SEND_TO_ORACLE 2
+
+#define CPU_PORT 768
+
 /*************************************************************************
  *********************** H E A D E R S  ***********************************
  *************************************************************************/
@@ -74,11 +79,40 @@ header udp_t {
   bit<16> checksum;
 }
 
+header features_t {
+    bit<64> feature1;
+    bit<64> feature2;
+    bit<64> feature3;
+    bit<64> feature4;
+    bit<64> feature5;
+    bit<64> feature6;
+    bit<64> feature7;
+    bit<64> feature8;
+    bit<64> feature9;
+    bit<64> feature10;
+    bit<64> feature11;
+    bit<64> feature12;
+    bit<64> dur;
+    bit<64> sbytes;
+    bit<64> dpkts;
+    bit<64> spkts;
+    bit<1>  malware;
+    bit<1>  is_first;
+    bit<62> padding;  // xa hacerlo múltiplo de 8 bytes (64 bits)
+} // 136 bytes en total
+
 struct metadata {
   bit<64> feature1;
   bit<64> feature2;
   bit<64> feature3;
+  bit<64> feature4;
   bit<64> feature5;
+  bit<64> feature6;
+  bit<64> feature7;
+  bit<64> feature8;
+  bit<64> feature9;
+  bit<64> feature10;
+  bit<64> feature11;
   bit<64> feature12;
 
   bit<16> prevFeature;
@@ -116,6 +150,7 @@ struct headers {
   ipv4_t       ipv4;
   tcp_t        tcp;
   udp_t        udp;
+  features_t   features;
 }
 
 /*************************************************************************
@@ -332,9 +367,40 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.node_id = node_id;
   }
 
-  action SetClass(bit<16> node_id, bit<16> class) {
-    meta.class = class;
+  action send_to_oracle() {
+    hdr.features.setValid();
+
+    hdr.features.feature1 = meta.feature1;
+    hdr.features.feature2 = meta.feature2;
+    hdr.features.feature3 = meta.feature3;
+    hdr.features.feature4 = 0;
+    hdr.features.feature5 = meta.feature5;
+    hdr.features.feature6 = 0;
+    hdr.features.feature7 = 0;
+    hdr.features.feature8 = 0;
+    hdr.features.feature9 = 0;
+    hdr.features.feature10 = 0;
+    hdr.features.feature11 = 0;
+    hdr.features.feature12 = meta.feature12;
+
+    hdr.features.dur     = (bit<64>)meta.dur;
+    hdr.features.sbytes  = 0;
+    hdr.features.dpkts   = (bit<64>)meta.dpkts;
+    hdr.features.spkts   = 0;
+    hdr.features.malware = 0;
+    hdr.features.is_first = meta.is_first;
+
+    standard_metadata.egress_spec = CPU_PORT;
+  }
+
+  action SetClass(bit<16> node_id, bit<16> class, bit<8> certainty) {
     meta.node_id = node_id;
+    if (certainty > THRESHOLD_CERTAINTY) {
+      meta.class = class;
+    }
+    else {
+      meta.class = SEND_TO_ORACLE;
+    }
   }
 
   action SetDirection() {
@@ -369,6 +435,47 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   }
 
   table level2{
+    key = {
+      meta.node_id: exact;
+      meta.prevFeature: exact;
+      meta.isTrue: exact;
+    }
+    actions = {
+      NoAction;
+      CheckFeature;
+      SetClass;
+    }
+    size = 1024;
+  }
+
+  table level3{
+    key = {
+      meta.node_id: exact;
+      meta.prevFeature: exact;
+      meta.isTrue: exact;
+    }
+    actions = {
+      NoAction;
+      CheckFeature;
+      SetClass;
+    }
+    size = 1024;
+  }
+  table level4{
+    key = {
+      meta.node_id: exact;
+      meta.prevFeature: exact;
+      meta.isTrue: exact;
+    }
+    actions = {
+      NoAction;
+      CheckFeature;
+      SetClass;
+    }
+    size = 1024;
+  }
+
+  table level5{
     key = {
       meta.node_id: exact;
       meta.prevFeature: exact;
@@ -529,25 +636,38 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           level1.apply();
           if (meta.class == CLASS_NOT_SET) {
             level2.apply();
-          } // level2
+            if (meta.class == CLASS_NOT_SET) {
+              level3.apply();
+              if (meta.class == CLASS_NOT_SET) {
+                level4.apply();
+                if (meta.class == CLASS_NOT_SET) {
+                  level5.apply();
+                }
+              }
+            }
+          }
         }//hash collision check
       }
 
-      if(meta.class == 0) {
-        standard_metadata.egress_spec = 771;
-        hdr.ipv4.ecn = 0;
-        counter.count(2);
-      } else {
-        standard_metadata.egress_spec = 770;
-        hdr.ipv4.ecn = 1;
-        counter.count(3);
+      if (meta.class == SEND_TO_ORACLE){
+        send_to_oracle();
+      }else{
+        if(meta.class == 0) {
+          standard_metadata.egress_spec = 771;
+          hdr.ipv4.ecn = 0;
+          counter.count(2);
+        } else {
+          standard_metadata.egress_spec = 770;
+          hdr.ipv4.ecn = 1;
+          counter.count(3);
+        }
+
+        hdr.ipv4.dstAddr = (bit<32>) standard_metadata.ingress_global_timestamp;
+        hdr.ipv4.srcAddr = (bit<32>) meta.time_first_pkt;
+        hdr.ipv4.dSField = (bit<6>) meta.dur;
+
+        //ipv4_exact.apply();
       }
-
-      hdr.ipv4.dstAddr = (bit<32>) standard_metadata.ingress_global_timestamp;
-      hdr.ipv4.srcAddr = (bit<32>) meta.time_first_pkt;
-      hdr.ipv4.dSField = (bit<6>) meta.dur;
-
-      //ipv4_exact.apply();
     }
   }
 }
