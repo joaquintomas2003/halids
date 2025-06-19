@@ -102,6 +102,14 @@ header features_t {
 } // 136 bytes en total
 
 struct metadata {
+  bit<16> class;
+  bit<8>  ct_state_ttl;
+  bit<32> dbytes;
+  bit<1>  direction;
+  bit<32> dpkts;
+  bit<16> dstport;
+  bit<8>  dttl;
+  bit<48> dur;
   bit<64> feature1;
   bit<64> feature2;
   bit<64> feature3;
@@ -114,38 +122,22 @@ struct metadata {
   bit<64> feature10;
   bit<64> feature11;
   bit<64> feature12;
-
-  bit<16> prevFeature;
+  bit<1>  first_ack;
   bit<16> isTrue;
-
-  bit<16> class;
+  bit<1>  is_first;
+  bit<1>  is_hash_collision;
   bit<16> node_id;
-
-  bit<1> direction;
+  bit<16> prevFeature;
   bit<32> register_index;
   bit<32> register_index_inverse;
-
+  bit<32> sbytes;
+  bit<32> spkts;
   bit<32> srcip;
   bit<16> srcport;
-  bit<16> dstport;
+  bit<8>  state;
+  bit<8>  sttl;
   bit<48> syn_time;
-  bit<32> spkts;
-  bit<8> sttl;
-  bit<8> dttl;
   bit<48> tcprtt;
-  bit<32> dbytes;
-  bit<32> sbytes;
-
-  bit<32> dpkts;
-
-  bit<1> is_first;
-  bit<1> is_hash_collision;
-  bit<1> first_ack;
-
-  bit<8> state;
-  bit<8> ct_state_ttl;
-  bit<48> dur;
-
   bit<48> time_first_pkt;
 }
 
@@ -173,7 +165,7 @@ parser MyParser(packet_in packet,
   state parse_ethernet {
     packet.extract(hdr.ethernet);
     transition select(hdr.ethernet.etherType) {
-TYPE_IPV4: parse_ipv4;
+      TYPE_IPV4: parse_ipv4;
       default: accept;
     }
   }
@@ -181,8 +173,8 @@ TYPE_IPV4: parse_ipv4;
   state parse_ipv4 {
     packet.extract(hdr.ipv4);
     transition select(hdr.ipv4.protocol) {
-6: parse_tcp;
-17: parse_udp;
+      6: parse_tcp;
+      17: parse_udp;
       default: accept;
     }
   }
@@ -211,42 +203,34 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
  *************************************************************************/
 
 control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-  register<bit<8>>(MAX_REGISTER_ENTRIES) reg_ttl;
-  register<bit<8>>(MAX_REGISTER_ENTRIES) reg_dttl;
-
-  register<bit<1>>(MAX_REGISTER_ENTRIES) reg_first_ack;
-
+  register<bit<32>>(MAX_REGISTER_ENTRIES) reg_dbytes;
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_dpkts;
-  register<bit<32>>(MAX_REGISTER_ENTRIES) reg_dbytes;//src dst byte count
-  register<bit<32>>(MAX_REGISTER_ENTRIES) reg_sbytes;//src dst byte count
-
-
-  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_syn_time;
-
-  //Registers for identifying the flow more apart from hash we may use source port
-  register<bit<32>>(MAX_REGISTER_ENTRIES) reg_spkts;//src dst pkt count
+  register<bit<16>>(MAX_REGISTER_ENTRIES) reg_dstport;
+  register<bit<8>>(MAX_REGISTER_ENTRIES)  reg_dttl;
+  register<bit<1>>(MAX_REGISTER_ENTRIES)  reg_first_ack;
+  register<bit<32>>(MAX_REGISTER_ENTRIES) reg_sbytes;
+  register<bit<32>>(MAX_REGISTER_ENTRIES) reg_spkts;
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_srcip;
   register<bit<16>>(MAX_REGISTER_ENTRIES) reg_srcport;
-  register<bit<16>>(MAX_REGISTER_ENTRIES) reg_dstport;
-  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
+  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_syn_time;
   register<bit<48>>(MAX_REGISTER_ENTRIES) reg_tcprtt;
+  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
+  register<bit<8>>(MAX_REGISTER_ENTRIES)  reg_ttl;
 
-  //Store some statistics for the experiment
   counter(6, CounterType.packets) counter_;
 
   action init_register() {
-    //intialise the registers to 0
-    reg_srcip.write(meta.register_index, 0);
-    reg_srcport.write(meta.register_index, 0);
-    reg_dstport.write(meta.register_index, 0);
-    reg_ttl.write(meta.register_index, 0);
-    reg_dttl.write(meta.register_index, 0);
-    reg_dpkts.write(meta.register_index, 0);
-    reg_tcprtt.write(meta.register_index, 0);
-    reg_syn_time.write(meta.register_index, 0);
     reg_dbytes.write(meta.register_index, 0);
+    reg_dpkts.write(meta.register_index, 0);
+    reg_dstport.write(meta.register_index, 0);
+    reg_dttl.write(meta.register_index, 0);
     reg_sbytes.write(meta.register_index, 0);
     reg_spkts.write(meta.register_index, 0);
+    reg_srcip.write(meta.register_index, 0);
+    reg_srcport.write(meta.register_index, 0);
+    reg_syn_time.write(meta.register_index, 0);
+    reg_tcprtt.write(meta.register_index, 0);
+    reg_ttl.write(meta.register_index, 0);
   }
 
   action get_register_index_tcp() {
@@ -773,22 +757,22 @@ control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata
 control MyComputeChecksum(inout headers  hdr, inout metadata meta) {
   apply {
     update_checksum(
-        hdr.ipv4.isValid(),
-        { hdr.ipv4.version,
-        hdr.ipv4.ihl,
-        hdr.ipv4.dSField,
-        hdr.ipv4.ecn,
-        hdr.ipv4.totalLen,
-        hdr.ipv4.identification,
-        hdr.ipv4.flags,
-        hdr.ipv4.fragOffset,
-        hdr.ipv4.ttl,
-        hdr.ipv4.protocol,
-        hdr.ipv4.srcAddr,
-        hdr.ipv4.dstAddr },
-        hdr.ipv4.hdrChecksum,
-        HashAlgorithm.csum16
-        );
+      hdr.ipv4.isValid(),
+      { hdr.ipv4.version,
+      hdr.ipv4.ihl,
+      hdr.ipv4.dSField,
+      hdr.ipv4.ecn,
+      hdr.ipv4.totalLen,
+      hdr.ipv4.identification,
+      hdr.ipv4.flags,
+      hdr.ipv4.fragOffset,
+      hdr.ipv4.ttl,
+      hdr.ipv4.protocol,
+      hdr.ipv4.srcAddr,
+      hdr.ipv4.dstAddr },
+      hdr.ipv4.hdrChecksum,
+      HashAlgorithm.csum16
+      );
   }
 }
 
@@ -810,10 +794,10 @@ control MyDeparser(packet_out packet, in headers hdr) {
  *************************************************************************/
 
   V1Switch(
-      MyParser(),
-      MyVerifyChecksum(),
-      MyIngress(),
-      MyEgress(),
-      MyComputeChecksum(),
-      MyDeparser()
-      ) main;
+    MyParser(),
+    MyVerifyChecksum(),
+    MyIngress(),
+    MyEgress(),
+    MyComputeChecksum(),
+    MyDeparser()
+    ) main;
