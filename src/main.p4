@@ -88,21 +88,6 @@ const bit<8> OPCODE_NO_OP         = 0;
 const bit<8> OPCODE_SEND_FEATURES = 1;
 const bit<8> OPCODE_RCV_LABEL     = 2;
 
-struct features_t {
-  bit<64> feature1;
-  bit<64> feature2;
-  bit<64> feature3;
-  bit<64> feature4;
-  bit<64> feature5;
-  bit<64> feature6;
-  bit<64> feature7;
-  bit<64> feature8;
-  bit<64> feature9;
-  bit<64> feature10;
-  bit<64> feature11;
-  bit<64> feature12;
-} // 96 bytes
-
 // packet from the controller (label)
 header packet_out_header_t {
   bit<8>                  packet_type; // 1 byte
@@ -119,7 +104,18 @@ header packet_in_header_t {
   bit<8>                  packet_type; // 1 byte
   bit<8>                  opcode; // 1 byte
   bit<32>                 flow_hash; // 4 byte
-  features_t              features; // 96 bytes
+  bit<64>                 feature1; // 8 bytes
+  bit<64>                 feature2; // 8 bytes
+  bit<64>                 feature3; // 8 bytes
+  bit<64>                 feature4; // 8 bytes
+  bit<64>                 feature5; // 8 bytes
+  bit<64>                 feature6; // 8 bytes
+  bit<64>                 feature7; // 8 bytes
+  bit<64>                 feature8; // 8 bytes
+  bit<64>                 feature9; // 8 bytes
+  bit<64>                 feature10; // 8 bytes
+  bit<64>                 feature11; // 8 bytes
+  bit<64>                 feature12; // 8 bytes
   bit<64>                 dur; // 8 bytes
   bit<64>                 sbytes; // 8 bytes
   bit<64>                 dpkts; // 8 bytes
@@ -446,18 +442,18 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
     // features to send to the controller
     hdr.packet_in.flow_hash = meta.register_index; // id 3
-    hdr.packet_in.features.feature1 = meta.feature1; // id 4
-    hdr.packet_in.features.feature2 = meta.feature2;
-    hdr.packet_in.features.feature3 = meta.feature3;
-    hdr.packet_in.features.feature4 = meta.feature4;
-    hdr.packet_in.features.feature5 = meta.feature5;
-    hdr.packet_in.features.feature6 = meta.feature6;
-    hdr.packet_in.features.feature7 = meta.feature7;
-    hdr.packet_in.features.feature8 = meta.feature8;
-    hdr.packet_in.features.feature9 = meta.feature9;
-    hdr.packet_in.features.feature10 = meta.feature10;
-    hdr.packet_in.features.feature11 = meta.feature11;
-    hdr.packet_in.features.feature12 = meta.feature12;  // id 15
+    hdr.packet_in.feature1 = meta.feature1; // id 4
+    hdr.packet_in.feature2 = meta.feature2;
+    hdr.packet_in.feature3 = meta.feature3;
+    hdr.packet_in.feature4 = meta.feature4;
+    hdr.packet_in.feature5 = meta.feature5;
+    hdr.packet_in.feature6 = meta.feature6;
+    hdr.packet_in.feature7 = meta.feature7;
+    hdr.packet_in.feature8 = meta.feature8;
+    hdr.packet_in.feature9 = meta.feature9;
+    hdr.packet_in.feature10 = meta.feature10;
+    hdr.packet_in.feature11 = meta.feature11;
+    hdr.packet_in.feature12 = meta.feature12;  // id 15
 
     // needed to calculate some features at the oracle (in the data plane the treshold is changed)
     hdr.packet_in.dur = (bit<64>)meta.dur;  // id 16
