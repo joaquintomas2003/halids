@@ -84,13 +84,13 @@ header udp_t {
 enum bit<8> ControllerPacketType_t {
   PACKET_IN       = 1,
   PACKET_OUT      = 2
-}
+} // 1 byte
 
 enum bit<8> ControllerOpcode_t {
   NO_OP                    = 0,
   SEND_FEATURES            = 1,
   RCV_LABEL                = 2
-}
+} // 1 byte
 
 header features_t {
   bit<64> feature1;
@@ -105,33 +105,33 @@ header features_t {
   bit<64> feature10;
   bit<64> feature11;
   bit<64> feature12;
-}
+} // 96 bytes
 
 // packet from the controller (label)
 header packet_out_header_t {
-  ControllerPacketType_t  packet_type;
-  ControllerOpcode_t      opcode;
-  bit<32>                 flow_hash; // TODO: do we need it?
-  bit<16>                 label;
+  ControllerPacketType_t  packet_type; // 1 byte
+  ControllerOpcode_t      opcode; // 1 byte
+  bit<32>                 flow_hash; // 4 bytes
+  bit<16>                 label; // 2 bytes
   bit<1>                  malware;
   bit<1>                  is_first;
   bit<6>                  reserved;
-}
+} // 9 bytes
 
 // packet to the controller (send features)
 header packet_in_header_t {
-  ControllerPacketType_t  packet_type;
-  ControllerOpcode_t      opcode;
-  bit<32>                 flow_hash;
-  features_t              features;
-  bit<64>                 dur;
-  bit<64>                 sbytes;
-  bit<64>                 dpkts;
-  bit<64>                 spkts;
+  ControllerPacketType_t  packet_type; // 1 byte
+  ControllerOpcode_t      opcode; // 1 byte
+  bit<32>                 flow_hash; // 4 byte
+  features_t              features; // 96 bytes
+  bit<64>                 dur; // 8 bytes
+  bit<64>                 sbytes; // 8 bytes
+  bit<64>                 dpkts; // 8 bytes
+  bit<64>                 spkts; // 8 bytes
   bit<1>                  malware;
   bit<1>                  is_first;
   bit<6>                  reserved;
-}
+} // 135 bytes
 
 struct metadata {
   bit<16> class;
