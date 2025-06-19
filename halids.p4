@@ -129,6 +129,7 @@ struct metadata {
   bit<16> srcport;
   bit<16> dstport;
   bit<48> syn_time;
+  bit<32> spkts;
   bit<8> sttl;
   bit<8> dttl;
   bit<48> tcprtt;
@@ -222,6 +223,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<48>>(MAX_REGISTER_ENTRIES) reg_syn_time;
 
   //Registers for identifying the flow more apart from hash we may use source port
+  register<bit<32>>(MAX_REGISTER_ENTRIES) reg_spkts;//src dst pkt count
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_srcip;
   register<bit<16>>(MAX_REGISTER_ENTRIES) reg_srcport;
   register<bit<16>>(MAX_REGISTER_ENTRIES) reg_dstport;
@@ -243,6 +245,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     reg_syn_time.write(meta.register_index, 0);
     reg_dbytes.write(meta.register_index, 0);
     reg_sbytes.write(meta.register_index, 0);
+    reg_spkts.write(meta.register_index, 0);
   }
 
   action get_register_index_tcp() {
@@ -349,6 +352,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.feature1 = (bit<64>)meta.sttl;
     meta.feature2 = (bit<64>)meta.ct_state_ttl;
     meta.feature3 = (bit<64>)meta.dttl;
+    meta.feature4 = (bit<64>)(meta.sbytes * (meta.spkts - 1) * 8);
     meta.feature5 = (bit<64>)meta.dpkts;
     meta.feature6 = (bit<64>)meta.dbytes;
     meta.feature7 = (bit<64>)meta.sbytes;
@@ -370,6 +374,10 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
     else if (f==3){
       feature = meta.feature3;
+    }
+    else if (f==4){
+      feature = meta.feature4 * 1000000;
+      th = th*(bit<64>)meta.dur * (bit<64>)meta.sbytes;
     }
     else if (f==5){
       feature = meta.feature5;
@@ -418,7 +426,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     hdr.features.dur     = (bit<64>)meta.dur;
     hdr.features.sbytes  = (bit<64>)meta.sbytes;
     hdr.features.dpkts   = (bit<64>)meta.dpkts;
-    hdr.features.spkts   = 0;
+    hdr.features.spkts   = (bit<64>)meta.spkts;
     hdr.features.malware = 0;
     hdr.features.is_first = meta.is_first;
 
@@ -589,6 +597,10 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
               reg_dstport.write((bit<32>)meta.register_index, meta.dstport);
             }
 
+            reg_spkts.read(meta.spkts, (bit<32>)meta.register_index);
+            meta.spkts = meta.spkts + 1;
+            reg_spkts.write((bit<32>)meta.register_index, meta.spkts);
+
             meta.sttl = hdr.ipv4.ttl;
             reg_ttl.write((bit<32>)meta.register_index, meta.sttl);
 
@@ -675,6 +687,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             reg_dttl.write((bit<32>)meta.register_index, meta.dttl);
             reg_ttl.read(meta.sttl, (bit<32>)meta.register_index);
             reg_sbytes.read(meta.sbytes, (bit<32>)meta.register_index);
+            reg_spkts.read(meta.spkts, (bit<32>)meta.register_index);
           }//hash collision check
         }
 
