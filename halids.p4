@@ -132,6 +132,7 @@ struct metadata {
   bit<8> sttl;
   bit<8> dttl;
   bit<48> tcprtt;
+  bit<32> dbytes;
 
   bit<32> dpkts;
 
@@ -214,6 +215,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<1>>(MAX_REGISTER_ENTRIES) reg_first_ack;
 
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_dpkts;
+  register<bit<32>>(MAX_REGISTER_ENTRIES) reg_dbytes;//src dst byte count
 
   register<bit<48>>(MAX_REGISTER_ENTRIES) reg_syn_time;
 
@@ -237,6 +239,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     reg_dpkts.write(meta.register_index, 0);
     reg_tcprtt.write(meta.register_index, 0);
     reg_syn_time.write(meta.register_index, 0);
+    reg_dbytes.write(meta.register_index, 0);
   }
 
   action get_register_index_tcp() {
@@ -344,6 +347,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.feature2 = (bit<64>)meta.ct_state_ttl;
     meta.feature3 = (bit<64>)meta.dttl;
     meta.feature5 = (bit<64>)meta.dpkts;
+    meta.feature6 = (bit<64>)meta.dbytes;
     meta.feature10 = (bit<64>)meta.tcprtt;
     meta.feature11 = (bit<64>)meta.dstport;
     meta.feature12 = (bit<64>)meta.dur;
@@ -365,6 +369,10 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
     else if (f==5){
       feature = meta.feature5;
+    }
+    else if (f==6){
+      feature = meta.feature6;
+      th = th * (bit<64>) meta.dpkts;
     }
     else if (f==10){
       feature = meta.feature10;
@@ -391,7 +399,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     hdr.features.feature3 = meta.feature3;
     hdr.features.feature4 = 0;
     hdr.features.feature5 = meta.feature5;
-    hdr.features.feature6 = 0;
+    hdr.features.feature6 = meta.feature6;
     hdr.features.feature7 = 0;
     hdr.features.feature8 = 0;
     hdr.features.feature9 = 0;
@@ -601,6 +609,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             }
 
             //read all reverse flow features
+            reg_dbytes.read(meta.dbytes, (bit<32>)meta.register_index);
             reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
           }//hash collision check
         }//end of direction = 1
@@ -644,6 +653,10 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
             meta.dpkts = meta.dpkts + 1;
             reg_dpkts.write((bit<32>)meta.register_index, meta.dpkts);
+
+            reg_dbytes.read(meta.dbytes, (bit<32>)meta.register_index);
+            meta.dbytes = meta.dbytes + standard_metadata.packet_length - 14;
+            reg_dbytes.write((bit<32>)meta.register_index, meta.dbytes);
 
             meta.dttl =  hdr.ipv4.ttl;
             reg_dttl.write((bit<32>)meta.register_index, meta.dttl);
