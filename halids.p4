@@ -356,6 +356,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.feature5 = (bit<64>)meta.dpkts;
     meta.feature6 = (bit<64>)meta.dbytes;
     meta.feature7 = (bit<64>)meta.sbytes;
+    meta.feature8 = (bit<64>)(meta.dbytes * (meta.dpkts - 1) * 8)
     meta.feature10 = (bit<64>)meta.tcprtt;
     meta.feature11 = (bit<64>)meta.dstport;
     meta.feature12 = (bit<64>)meta.dur;
@@ -390,6 +391,10 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       feature = meta.feature7;
       th = th * (bit<64>) meta.dpkts;
     }
+    else if (f==8){
+      feature = meta.feature8 * 1000000;
+      th = th * (bit<64>)meta.dur * (bit<64>)meta.sbytes;
+    }
     else if (f==10){
       feature = meta.feature10;
     }
@@ -417,7 +422,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     hdr.features.feature5 = meta.feature5;
     hdr.features.feature6 = meta.feature6;
     hdr.features.feature7 = meta.feature7;
-    hdr.features.feature8 = 0;
+    hdr.features.feature8 = meta.feature8;
     hdr.features.feature9 = 0;
     hdr.features.feature10 = meta.feature10;
     hdr.features.feature11 = meta.feature11;
