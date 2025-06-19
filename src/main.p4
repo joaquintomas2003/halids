@@ -81,16 +81,12 @@ header udp_t {
 
 // packetIn is the packet sent from switch to controller. (from controller view)
 // packetOut is the packet sent from controller to switch. (from controller view)
-enum bit<8> ControllerPacketType_t {
-  PACKET_IN       = 1,
-  PACKET_OUT      = 2
-} // 1 byte
+const bit<8> PACKET_TYPE_IN  = 1;
+const bit<8> PACKET_TYPE_OUT = 2;
 
-enum bit<8> ControllerOpcode_t {
-  NO_OP                    = 0,
-  SEND_FEATURES            = 1,
-  RCV_LABEL                = 2
-} // 1 byte
+const bit<8> OPCODE_NO_OP         = 0;
+const bit<8> OPCODE_SEND_FEATURES = 1;
+const bit<8> OPCODE_RCV_LABEL     = 2;
 
 header features_t {
   bit<64> feature1;
@@ -109,8 +105,8 @@ header features_t {
 
 // packet from the controller (label)
 header packet_out_header_t {
-  ControllerPacketType_t  packet_type; // 1 byte
-  ControllerOpcode_t      opcode; // 1 byte
+  bit<8>                  packet_type; // 1 byte
+  bit<8>                  opcode; // 1 byte
   bit<32>                 flow_hash; // 4 bytes
   bit<16>                 label; // 2 bytes
   bit<1>                  malware;
@@ -120,8 +116,8 @@ header packet_out_header_t {
 
 // packet to the controller (send features)
 header packet_in_header_t {
-  ControllerPacketType_t  packet_type; // 1 byte
-  ControllerOpcode_t      opcode; // 1 byte
+  bit<8>                  packet_type; // 1 byte
+  bit<8>                  opcode; // 1 byte
   bit<32>                 flow_hash; // 4 byte
   features_t              features; // 96 bytes
   bit<64>                 dur; // 8 bytes
@@ -445,8 +441,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
     // set egress port to CPU PORT
     standard_metadata.egress_spec = CPU_PORT;
-    hdr.packet_in.packet_type = ControllerPacketType_t.PACKET_IN; // metadata id 1
-    hdr.packet_in.opcode = ControllerOpcode_t.SEND_FEATURES; // id 2
+    hdr.packet_in.packet_type = PACKET_TYPE_IN; // metadata id 1
+    hdr.packet_in.opcode = OPCODE_SEND_FEATURES; // id 2
 
     // features to send to the controller
     hdr.packet_in.flow_hash = meta.register_index; // id 3
