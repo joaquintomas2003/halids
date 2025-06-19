@@ -460,7 +460,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     hdr.packet_in.sbytes = (bit<64>)meta.sbytes; // id 17
     hdr.packet_in.dpkts = (bit<64>)meta.dpkts;  // id 18
     hdr.packet_in.spkts = (bit<64>)meta.spkts;  // id 19
-    hdr.packet_in.malware = meta.malware; // send priori knowledge of malware
+    hdr.packet_in.malware = 0; // send priori knowledge of malware
     hdr.packet_in.is_first = meta.is_first;
     hdr.packet_in.reserved = 0;
   }
