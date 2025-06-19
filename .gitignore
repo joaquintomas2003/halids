@@ -1,3 +1,6 @@
 pifout/
 out/
 Makefile-nfp4build
+ml_data/*
+!ml_data/.gitkeep
+__pycache__/
