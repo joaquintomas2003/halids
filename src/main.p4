@@ -79,27 +79,59 @@ header udp_t {
   bit<16> checksum;
 }
 
+// packetIn is the packet sent from switch to controller. (from controller view)
+// packetOut is the packet sent from controller to switch. (from controller view)
+enum bit<8> ControllerPacketType_t {
+  PACKET_IN       = 1,
+  PACKET_OUT      = 2
+}
+
+enum bit<8> ControllerOpcode_t {
+  NO_OP                    = 0,
+  SEND_FEATURES            = 1,
+  RCV_LABEL                = 2
+}
+
 header features_t {
-    bit<64> feature1;
-    bit<64> feature2;
-    bit<64> feature3;
-    bit<64> feature4;
-    bit<64> feature5;
-    bit<64> feature6;
-    bit<64> feature7;
-    bit<64> feature8;
-    bit<64> feature9;
-    bit<64> feature10;
-    bit<64> feature11;
-    bit<64> feature12;
-    bit<64> dur;
-    bit<64> sbytes;
-    bit<64> dpkts;
-    bit<64> spkts;
-    bit<1>  malware;
-    bit<1>  is_first;
-    bit<62> padding;  // xa hacerlo múltiplo de 8 bytes (64 bits)
-} // 136 bytes en total
+  bit<64> feature1;
+  bit<64> feature2;
+  bit<64> feature3;
+  bit<64> feature4;
+  bit<64> feature5;
+  bit<64> feature6;
+  bit<64> feature7;
+  bit<64> feature8;
+  bit<64> feature9;
+  bit<64> feature10;
+  bit<64> feature11;
+  bit<64> feature12;
+}
+
+// packet from the controller (label)
+header packet_out_header_t {
+  ControllerPacketType_t  packet_type;
+  ControllerOpcode_t      opcode;
+  bit<32>                 flow_hash; // TODO: do we need it?
+  bit<16>                 label;
+  bit<1>                  malware;
+  bit<1>                  is_first;
+  bit<6>                  reserved;
+}
+
+// packet to the controller (send features)
+header packet_in_header_t {
+  ControllerPacketType_t  packet_type;
+  ControllerOpcode_t      opcode;
+  bit<32>                 flow_hash;
+  features_t              features;
+  bit<64>                 dur;
+  bit<64>                 sbytes;
+  bit<64>                 dpkts;
+  bit<64>                 spkts;
+  bit<1>                  malware;
+  bit<1>                  is_first;
+  bit<6>                  reserved;
+}
 
 struct metadata {
   bit<16> class;
@@ -149,7 +181,8 @@ struct headers {
   ipv4_t       ipv4;
   tcp_t        tcp;
   udp_t        udp;
-  features_t   features;
+  packet_in_header_t packet_in;
+  packet_out_header_t packet_out;
 }
 
 /*************************************************************************
@@ -407,29 +440,37 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   }
 
   action send_to_oracle() {
-    hdr.features.setValid();
+    // header to send packet to controller
+    hdr.packet_in.setValid();
 
-    hdr.features.feature1 = meta.feature1;
-    hdr.features.feature2 = meta.feature2;
-    hdr.features.feature3 = meta.feature3;
-    hdr.features.feature4 = meta.feature4;
-    hdr.features.feature5 = meta.feature5;
-    hdr.features.feature6 = meta.feature6;
-    hdr.features.feature7 = meta.feature7;
-    hdr.features.feature8 = meta.feature8;
-    hdr.features.feature9 = meta.feature9;
-    hdr.features.feature10 = meta.feature10;
-    hdr.features.feature11 = meta.feature11;
-    hdr.features.feature12 = meta.feature12;
-
-    hdr.features.dur     = (bit<64>)meta.dur;
-    hdr.features.sbytes  = (bit<64>)meta.sbytes;
-    hdr.features.dpkts   = (bit<64>)meta.dpkts;
-    hdr.features.spkts   = (bit<64>)meta.spkts;
-    hdr.features.malware = 0;
-    hdr.features.is_first = meta.is_first;
-
+    // set egress port to CPU PORT
     standard_metadata.egress_spec = CPU_PORT;
+    hdr.packet_in.packet_type = ControllerPacketType_t.PACKET_IN; // metadata id 1
+    hdr.packet_in.opcode = ControllerOpcode_t.SEND_FEATURES; // id 2
+
+    // features to send to the controller
+    hdr.packet_in.flow_hash = meta.register_index; // id 3
+    hdr.packet_in.features.feature1 = meta.feature1; // id 4
+    hdr.packet_in.features.feature2 = meta.feature2;
+    hdr.packet_in.features.feature3 = meta.feature3;
+    hdr.packet_in.features.feature4 = meta.feature4;
+    hdr.packet_in.features.feature5 = meta.feature5;
+    hdr.packet_in.features.feature6 = meta.feature6;
+    hdr.packet_in.features.feature7 = meta.feature7;
+    hdr.packet_in.features.feature8 = meta.feature8;
+    hdr.packet_in.features.feature9 = meta.feature9;
+    hdr.packet_in.features.feature10 = meta.feature10;
+    hdr.packet_in.features.feature11 = meta.feature11;
+    hdr.packet_in.features.feature12 = meta.feature12;  // id 15
+
+    // needed to calculate some features at the oracle (in the data plane the treshold is changed)
+    hdr.packet_in.dur = (bit<64>)meta.dur;  // id 16
+    hdr.packet_in.sbytes = (bit<64>)meta.sbytes; // id 17
+    hdr.packet_in.dpkts = (bit<64>)meta.dpkts;  // id 18
+    hdr.packet_in.spkts = (bit<64>)meta.spkts;  // id 19
+    hdr.packet_in.malware = meta.malware; // send priori knowledge of malware
+    hdr.packet_in.is_first = meta.is_first;
+    hdr.packet_in.reserved = 0;
   }
 
   action SetClass(bit<16> node_id, bit<16> class, bit<8> certainty) {
