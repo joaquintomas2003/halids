@@ -132,18 +132,19 @@ class Oracle():
 
         payload = pkt[Raw].load
 
-        if len(payload) < 136:
+        if len(payload) < 135:
             print(f"Payload too short ({len(payload)} bytes). Expected 136.")
             return
 
+        base = 6 # 6 bytes from packet_type, opcode and flow_hash
         # TODO: Mandarlos de p4 y contrastar los valores con un print
-        dur_value = get_u64(payload, 96)
-        sbytes_value = get_u64(payload, 104)
-        dpkts_value = get_u64(payload, 112)
-        spkts_value = get_u64(payload, 120)
+        dur_value = get_u64(payload, base + 96)
+        sbytes_value = get_u64(payload, base + 104)
+        dpkts_value = get_u64(payload, base + 112)
+        spkts_value = get_u64(payload, base + 120)
 
         # Boolean flags (malware and is_first) packed in last byte
-        flag_byte = payload[135]
+        flag_byte = payload[base + 135]
         malware = (flag_byte >> 7) & 0x1  # first bit
         is_first = (flag_byte >> 6) & 0x1  # second bit
 
@@ -152,7 +153,7 @@ class Oracle():
         max_int = sys.maxsize
 
         for i in range(12):
-            offset = i * 8
+            offset = base + i * 8
             orig_value = get_u64(payload, offset)
             retrain_value = orig_value
 
