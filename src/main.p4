@@ -88,7 +88,7 @@ const bit<8> OPCODE_NO_OP         = 0;
 const bit<8> OPCODE_SEND_FEATURES = 1;
 const bit<8> OPCODE_RCV_LABEL     = 2;
 
-header features_t {
+struct features_t {
   bit<64> feature1;
   bit<64> feature2;
   bit<64> feature3;
