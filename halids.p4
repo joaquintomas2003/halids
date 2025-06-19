@@ -134,6 +134,7 @@ struct metadata {
   bit<8> dttl;
   bit<48> tcprtt;
   bit<32> dbytes;
+  bit<32> sbytes;
 
   bit<32> dpkts;
 
@@ -352,11 +353,11 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.feature1 = (bit<64>)meta.sttl;
     meta.feature2 = (bit<64>)meta.ct_state_ttl;
     meta.feature3 = (bit<64>)meta.dttl;
-    meta.feature4 = (bit<64>)(meta.sbytes * (meta.spkts - 1) * 8);
+    // meta.feature4 = (bit<64>)(meta.sbytes * (meta.spkts - 1) * 8);
     meta.feature5 = (bit<64>)meta.dpkts;
     meta.feature6 = (bit<64>)meta.dbytes;
     meta.feature7 = (bit<64>)meta.sbytes;
-    meta.feature8 = (bit<64>)(meta.dbytes * (meta.dpkts - 1) * 8);
+    // meta.feature8 = (bit<64>)(meta.dbytes * (meta.dpkts - 1) * 8);
     meta.feature9 = (bit<64>)meta.sbytes;
     meta.feature10 = (bit<64>)meta.tcprtt;
     meta.feature11 = (bit<64>)meta.dstport;
@@ -378,27 +379,27 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       feature = meta.feature3;
     }
     else if (f==4){
-      feature = meta.feature4 * 1000000;
-      th = th*(bit<64>)meta.dur * (bit<64>)meta.sbytes;
+      // feature = meta.feature4 * 1000000;
+      // th = th*(bit<64>)meta.dur * (bit<64>)meta.sbytes;
     }
     else if (f==5){
       feature = meta.feature5;
     }
     else if (f==6){
       feature = meta.feature6;
-      th = th * (bit<64>) meta.dpkts;
+      // th = th * (bit<64>) meta.dpkts;
     }
     else if (f==7){
       feature = meta.feature7;
-      th = th * (bit<64>) meta.dpkts;
+      // th = th * (bit<64>) meta.dpkts;
     }
     else if (f==8){
-      feature = meta.feature8 * 1000000;
-      th = th * (bit<64>)meta.dur * (bit<64>)meta.sbytes;
+      // feature = meta.feature8 * 1000000;
+      // th = th * (bit<64>)meta.dur * (bit<64>)meta.sbytes;
     }
     else if (f==9){
       feature = meta.feature9;
-      th = th * (bit<64>)meta.spkts;
+      // th = th * (bit<64>)meta.spkts;
     }
     else if (f==10){
       feature = meta.feature10;
@@ -618,7 +619,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
             //read_sbytes also used for sload
             reg_sbytes.read(meta.sbytes, (bit<32>)meta.register_index);
-            meta.sbytes = meta.sbytes + standard_metadata.packet_length - 14;
+            // meta.sbytes = meta.sbytes + standard_metadata.packet_length - 14;
             reg_sbytes.write((bit<32>)meta.register_index, meta.sbytes);
 
             // tcprtt
@@ -690,7 +691,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             reg_dpkts.write((bit<32>)meta.register_index, meta.dpkts);
 
             reg_dbytes.read(meta.dbytes, (bit<32>)meta.register_index);
-            meta.dbytes = meta.dbytes + standard_metadata.packet_length - 14;
+            // meta.dbytes = meta.dbytes + standard_metadata.packet_length - 14;
             reg_dbytes.write((bit<32>)meta.register_index, meta.dbytes);
 
             meta.dttl =  hdr.ipv4.ttl;
