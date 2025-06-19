@@ -128,15 +128,18 @@ struct metadata {
   bit<32> srcip;
   bit<16> srcport;
   bit<16> dstport;
+  bit<48> syn_time;
   bit<16> hdr_srcport;
   bit<16> hdr_dstport;
   bit<8> sttl;
   bit<8> dttl;
+  bit<48> tcprtt;
 
   bit<32> dpkts;
 
   bit<1> is_first;
   bit<1> is_hash_collision;
+  bit<1> first_ack;
 
   bit<8> state;
   bit<8> ct_state_ttl;
@@ -210,13 +213,18 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<8>>(MAX_REGISTER_ENTRIES) reg_ttl;
   register<bit<8>>(MAX_REGISTER_ENTRIES) reg_dttl;
 
+  register<bit<1>>(MAX_REGISTER_ENTRIES) reg_first_ack;
+
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_dpkts;
+
+  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_syn_time;
 
   //Registers for identifying the flow more apart from hash we may use source port
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_srcip;
   register<bit<16>>(MAX_REGISTER_ENTRIES) reg_srcport;
   register<bit<16>>(MAX_REGISTER_ENTRIES) reg_dstport;
   register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
+  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_tcprtt;
 
   //Store some statistics for the experiment
   counter(10, CounterType.packets) counter;
@@ -229,6 +237,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     reg_ttl.write(meta.register_index, 0);
     reg_dttl.write(meta.register_index, 0);
     reg_dpkts.write(meta.register_index, 0);
+    reg_tcprtt.write(meta.register_index, 0);
+    reg_syn_time.write(meta.register_index, 0);
   }
 
   action get_register_index_tcp() {
@@ -336,6 +346,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.feature2 = (bit<64>)meta.ct_state_ttl;
     meta.feature3 = (bit<64>)meta.dttl;
     meta.feature5 = (bit<64>)meta.dpkts;
+    meta.feature10 = (bit<64>)meta.tcprtt;
     meta.feature12 = (bit<64>)meta.dur;//dur
   }
 
@@ -355,6 +366,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
     else if (f==5){
       feature = meta.feature5;
+    }
+    else if (f==10){
+      feature = meta.feature10;
     }
     else if (f==12){
       feature = meta.feature12;
@@ -379,7 +393,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     hdr.features.feature7 = 0;
     hdr.features.feature8 = 0;
     hdr.features.feature9 = 0;
-    hdr.features.feature10 = 0;
+    hdr.features.feature10 = meta.feature10;
     hdr.features.feature11 = 0;
     hdr.features.feature12 = meta.feature12;
 
@@ -564,7 +578,25 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
             // tcprtt
             //SYN TIME
-            //TODO: if-else calculo tcprtt
+            if ((hdr.tcp.ack != (bit<1>)1)&&(hdr.tcp.syn == (bit<1>)1)) {//this is a SYN
+              reg_syn_time.write((bit<32>)meta.register_index, standard_metadata.ingress_global_timestamp);
+            }
+            //ACK + SYN time
+            else if ((hdr.tcp.ack == (bit<1>)1)&&(hdr.tcp.syn != (bit<1>)1)) {//this is an ACK
+              reg_first_ack.read(meta.first_ack, (bit<32>)meta.register_index);
+
+              if (meta.first_ack == 0) {
+                //sum of synack(SYN to SYN_ACK time) and ackdat(SYN_ACK to ACK time)
+                reg_syn_time.read(meta.syn_time, (bit<32>)meta.register_index);
+
+                if (meta.syn_time > 0) {//There was a syn before
+                  meta.tcprtt = standard_metadata.ingress_global_timestamp - meta.syn_time;
+                  reg_tcprtt.write((bit<32>)meta.register_index, meta.tcprtt);
+                  //no longer a first ack
+                  reg_first_ack.write((bit<32>)meta.register_index, 1);
+                }
+              }
+            }
 
             //read all reverse flow features
             reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
