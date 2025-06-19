@@ -232,7 +232,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<48>>(MAX_REGISTER_ENTRIES) reg_tcprtt;
 
   //Store some statistics for the experiment
-  counter(10, CounterType.packets) counter;
+  counter(6, CounterType.packets) counter_;
 
   action init_register() {
     //intialise the registers to 0
@@ -557,11 +557,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   apply {
     direction.apply();
 
-    if (meta.direction == 0){
-      counter.count(0);
-    } else {
-      counter.count(1);
-    };
+    counter_.count(1); // Packet count
 
     meta.class = CLASS_NOT_SET;
 
@@ -597,6 +593,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             //Hash collision!
             //TODO handle hash collisions in a better way!
             meta.is_hash_collision = 1;
+            counter_.count(0); // Hash collision count
           }
 
           if (meta.is_hash_collision == 0) {
@@ -676,6 +673,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             //Hash collision!
             //TODO handle hash collisions in a better way!
             meta.is_hash_collision = 1;
+            counter_.count(0); // Hash collision count
           }
 
           if (meta.is_hash_collision == 0) {
@@ -683,7 +681,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
               reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.dstAddr);
               reg_srcport.write((bit<32>)meta.register_index, meta.srcport);
               reg_dstport.write((bit<32>)meta.register_index, meta.dstport);
-
+              counter_.count(3); // Flows count
             }
 
             reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
@@ -736,15 +734,18 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
       if (meta.class == SEND_TO_ORACLE){
         send_to_oracle();
+        counter_.count(5); // Send to oracle count
       }else{
         if(meta.class == 0) {
           standard_metadata.egress_spec = 771;
           hdr.ipv4.ecn = 0;
-          counter.count(2);
+          counter_.count(2); // Malware
+          if (meta.is_first == 1) {
+            counter_.count(4); // Malware flows count
+          };
         } else {
           standard_metadata.egress_spec = 770;
           hdr.ipv4.ecn = 1;
-          counter.count(3);
         }
 
         hdr.ipv4.dstAddr = (bit<32>) standard_metadata.ingress_global_timestamp;
