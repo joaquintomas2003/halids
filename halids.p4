@@ -130,7 +130,6 @@ struct metadata {
   bit<16> dstport;
   bit<48> syn_time;
   bit<16> hdr_srcport;
-  bit<16> hdr_dstport;
   bit<8> sttl;
   bit<8> dttl;
   bit<48> tcprtt;
@@ -347,7 +346,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     meta.feature3 = (bit<64>)meta.dttl;
     meta.feature5 = (bit<64>)meta.dpkts;
     meta.feature10 = (bit<64>)meta.tcprtt;
-    meta.feature12 = (bit<64>)meta.dur;//dur
+    meta.feature11 = (bit<64>)meta.dstport;
+    meta.feature12 = (bit<64>)meta.dur;
   }
 
   action CheckFeature(bit<16> node_id, bit<16> f_inout, bit<64> threshold) {
@@ -369,6 +369,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
     else if (f==10){
       feature = meta.feature10;
+    }
+    else if (f==11){
+      feature = meta.feature11;
     }
     else if (f==12){
       feature = meta.feature12;
@@ -394,7 +397,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     hdr.features.feature8 = 0;
     hdr.features.feature9 = 0;
     hdr.features.feature10 = meta.feature10;
-    hdr.features.feature11 = 0;
+    hdr.features.feature11 = meta.feature11;
     hdr.features.feature12 = meta.feature12;
 
     hdr.features.dur     = (bit<64>)meta.dur;
@@ -539,12 +542,12 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           if (hdr.ipv4.protocol == 6) {
             get_register_index_tcp();
             meta.hdr_srcport = hdr.tcp.srcPort;
-            meta.hdr_dstport = hdr.tcp.dstPort;
+            meta.dstport = hdr.tcp.dstPort;
           }
           else {
             get_register_index_udp();
             meta.hdr_srcport = hdr.udp.srcPort;
-            meta.hdr_dstport = hdr.udp.dstPort;
+            meta.dstport = hdr.udp.dstPort;
           }
 
           //read_reg_to_check_collision srcip, srcport, dstport
@@ -556,7 +559,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             meta.is_first = 1;
           }
           else if (meta.srcip != hdr.ipv4.srcAddr || meta.srcport != meta.hdr_srcport
-              || meta.dstport != meta.hdr_dstport) {
+              || meta.dstport != meta.dstport) {
             //Hash collision!
             //TODO handle hash collisions in a better way!
             meta.is_hash_collision = 1;
@@ -568,7 +571,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
               reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
               reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.srcAddr);
               reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
-              reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
+              reg_dstport.write((bit<32>)meta.register_index, meta.dstport);
             }
 
             meta.sttl = hdr.ipv4.ttl;
@@ -607,12 +610,12 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           if (hdr.ipv4.protocol == 6) {
             get_register_index_inverse_tcp();
             meta.hdr_srcport = hdr.tcp.dstPort;//its inverse
-            meta.hdr_dstport = hdr.tcp.srcPort;
+            meta.dstport = hdr.tcp.srcPort;
           }
           else {
             get_register_index_inverse_udp();
             meta.hdr_srcport = hdr.udp.dstPort;
-            meta.hdr_dstport = hdr.udp.srcPort;
+            meta.dstport = hdr.udp.srcPort;
           }
 
           meta.register_index = meta.register_index_inverse;
@@ -625,7 +628,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             meta.is_first = 1;
           }
           else if (meta.srcip != hdr.ipv4.dstAddr || meta.srcport != meta.hdr_srcport
-              || meta.dstport != meta.hdr_dstport) {
+              || meta.dstport != meta.dstport) {
             //Hash collision!
             //TODO handle hash collisions in a better way!
             meta.is_hash_collision = 1;
@@ -635,7 +638,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             if (meta.is_first == 1) {//shouldn't happen!
               reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.dstAddr);
               reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
-              reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
+              reg_dstport.write((bit<32>)meta.register_index, meta.dstport);
 
             }
 
