@@ -4,7 +4,7 @@
 
 const bit<16> TYPE_IPV4 = 0x800;
 #define CLASS_NOT_SET 10000// A big number
-#define MAX_REGISTER_ENTRIES 8192
+#define MAX_REGISTER_ENTRIES 32768
 
 #define STATE_INT 1
 #define STATE_FIN 2
@@ -220,7 +220,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
   register<bit<8>>(MAX_REGISTER_ENTRIES)  reg_ttl;
 
-  counter(6, CounterType.packets) counter_;
+  counter(10, CounterType.packets) counter_;
 
   action init_register() {
     reg_dbytes.write(meta.register_index, 0);
@@ -554,7 +554,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
     if (hdr.ipv4.isValid()) {
 
-      if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6 || hdr.ipv4.protocol == 17) {//We treat only TCP or UDP packets (and ICMP for testing)
+      if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6) {//We treat only TCP or UDP packets (and ICMP for testing)
         if (meta.direction == 1) {
           if (hdr.ipv4.protocol == 6) {
             get_register_index_tcp();
@@ -688,6 +688,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }
 
         if (meta.is_hash_collision == 0) {
+          counter_.count(8);
           reg_time_first_pkt.read(meta.time_first_pkt, (bit<32>)meta.register_index);
           meta.dur = standard_metadata.ingress_global_timestamp - meta.time_first_pkt;
 
@@ -717,7 +718,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             }
           }
         }//hash collision check
-      }
+      } else {
+        counter_.count(9);
+      };
 
       if (meta.class == SEND_TO_ORACLE){
         send_to_oracle();
@@ -727,19 +730,13 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           standard_metadata.egress_spec = 771;
           hdr.ipv4.ecn = 0;
           counter_.count(4); // Malware
-          if (meta.is_first == 1) {
-            counter_.count(5); // Malware flows count
-          };
-        } else {
+        } else if (meta.class == 1){
           standard_metadata.egress_spec = 770;
           hdr.ipv4.ecn = 1;
-        }
-
-        hdr.ipv4.dstAddr = (bit<32>) standard_metadata.ingress_global_timestamp;
-        hdr.ipv4.srcAddr = (bit<32>) meta.time_first_pkt;
-        hdr.ipv4.dSField = (bit<6>) meta.dur;
-
-        //ipv4_exact.apply();
+          counter_.count(3); // Not Malware
+        } else {
+          counter_.count(6); // Not assigned
+        };
       }
     }
   }
