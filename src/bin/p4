@@ -61,6 +61,8 @@ case "$COMMAND" in
       -l lithium \
       --shared-codestore \
       -4 "$P4_FILE" \
+      -d flowcache \
+      --include /opt/netronome/p4/components/flowcache/me/lib/flowcache \
       $C_FLAG \
       -c main.c
     echo "✅ Compilation complete: $FIRMWARE_PATH"
