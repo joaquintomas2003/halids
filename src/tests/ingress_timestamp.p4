@@ -11,7 +11,10 @@ typedef bit<16> egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 
-extern void set_ingress_timestamp();
+struct intrinsic_metadata_t {
+  bit<64> ingress_global_timestamp;
+  bit<64> current_global_timestamp;
+}
 
 header ethernet_t {
   macAddr_t dstAddr;
@@ -63,8 +66,8 @@ header udp_t {
 }
 
 header timestamp_t {
-  bit<32> ingress_ts;
-  bit<32> egress_ts;
+  bit<64>ig_ts;
+  bit<64>eg_ts;
 }
 
 struct headers {
@@ -76,6 +79,7 @@ struct headers {
 }
 
 struct metadata {
+  intrinsic_metadata_t intrinsic_metadata;
 }
 
 /*************************************************************************
@@ -93,9 +97,7 @@ parser MyParser(packet_in packet,
 
   state parse_ethernet {
     packet.extract(hdr.ethernet);
-    transition select(hdr.ethernet.etherType) {
-      default: accept;
-    }
+    transition accept;
   }
 }
 
@@ -117,9 +119,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   apply {
     counter_pkts.count(0);
 
-    set_ingress_timestamp();
-
-    hdr.ethernet.srcAddr = (bit<48>) standard_metadata.ingress_global_timestamp;
+    hdr.ts.setValid();
+    hdr.ts.ig_ts = meta.intrinsic_metadata.ingress_global_timestamp;
 
     standard_metadata.egress_spec = 768;
   }
