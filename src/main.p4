@@ -4,7 +4,7 @@
 
 const bit<16> TYPE_IPV4 = 0x800;
 #define CLASS_NOT_SET 10000// A big number
-#define MAX_REGISTER_ENTRIES 8192
+#define MAX_REGISTER_ENTRIES 32768
 
 #define STATE_INT 1
 #define STATE_FIN 2
@@ -123,6 +123,9 @@ struct metadata {
   bit<64> feature11;
   bit<64> feature12;
   bit<1>  first_ack;
+  bit<16> hdr_dstport;
+  bit<16> hdr_srcport;
+  bit<32> hdr_srcip;
   bit<16> isTrue;
   bit<1>  is_first;
   bit<1>  is_hash_collision;
@@ -217,7 +220,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
   register<bit<8>>(MAX_REGISTER_ENTRIES)  reg_ttl;
 
-  counter(6, CounterType.packets) counter_;
+  counter(10, CounterType.packets) counter_;
 
   action init_register() {
     reg_dbytes.write(meta.register_index, 0);
@@ -541,7 +544,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   apply {
     direction.apply();
 
-    counter_.count(1); // Packet count
+    counter_.count(0); // Packet count
 
     meta.class = CLASS_NOT_SET;
 
@@ -551,17 +554,17 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
     if (hdr.ipv4.isValid()) {
 
-      if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6 || hdr.ipv4.protocol == 17) {//We treat only TCP or UDP packets (and ICMP for testing)
+      if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6) {//We treat only TCP or UDP packets (and ICMP for testing)
         if (meta.direction == 1) {
           if (hdr.ipv4.protocol == 6) {
             get_register_index_tcp();
-            meta.srcport = hdr.tcp.srcPort;
-            meta.dstport = hdr.tcp.dstPort;
+            meta.hdr_srcport = hdr.tcp.srcPort;
+            meta.hdr_dstport = hdr.tcp.dstPort;
           }
           else {
             get_register_index_udp();
-            meta.srcport = hdr.udp.srcPort;
-            meta.dstport = hdr.udp.dstPort;
+            meta.hdr_srcport = hdr.udp.srcPort;
+            meta.hdr_dstport = hdr.udp.dstPort;
           }
 
           //read_reg_to_check_collision srcip, srcport, dstport
@@ -572,12 +575,12 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           if (meta.srcip == 0) {//It was an empty register
             meta.is_first = 1;
           }
-          else if (meta.srcip != hdr.ipv4.srcAddr || meta.srcport != meta.srcport
-              || meta.dstport != meta.dstport) {
+          else if (meta.srcip != hdr.ipv4.srcAddr || meta.hdr_srcport != meta.srcport
+              || meta.hdr_dstport != meta.dstport) {
             //Hash collision!
             //TODO handle hash collisions in a better way!
             meta.is_hash_collision = 1;
-            counter_.count(0); // Hash collision count
+            counter_.count(1); // Hash collision count
           }
 
           if (meta.is_hash_collision == 0) {
@@ -585,8 +588,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
               meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
               reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
               reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.srcAddr);
-              reg_srcport.write((bit<32>)meta.register_index, meta.srcport);
-              reg_dstport.write((bit<32>)meta.register_index, meta.dstport);
+              reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
+              reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
             }
 
             reg_spkts.read(meta.spkts, (bit<32>)meta.register_index);
@@ -634,13 +637,13 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         else {//direction = 0
           if (hdr.ipv4.protocol == 6) {
             get_register_index_inverse_tcp();
-            meta.srcport = hdr.tcp.dstPort;//its inverse
-            meta.dstport = hdr.tcp.srcPort;
+            meta.hdr_srcport = hdr.tcp.dstPort;//its inverse
+            meta.hdr_dstport = hdr.tcp.srcPort;
           }
           else {
             get_register_index_inverse_udp();
-            meta.srcport = hdr.udp.dstPort;
-            meta.dstport = hdr.udp.srcPort;
+            meta.hdr_srcport = hdr.udp.dstPort;
+            meta.hdr_dstport = hdr.udp.srcPort;
           }
 
           meta.register_index = meta.register_index_inverse;
@@ -652,20 +655,20 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           if (meta.srcip == 0) {//It was an empty register
             meta.is_first = 1;
           }
-          else if (meta.srcip != hdr.ipv4.dstAddr || meta.srcport != meta.srcport
-              || meta.dstport != meta.dstport) {
+          else if (meta.srcip != hdr.ipv4.dstAddr || meta.hdr_srcport != meta.srcport
+              || meta.hdr_dstport != meta.dstport) {
             //Hash collision!
             //TODO handle hash collisions in a better way!
             meta.is_hash_collision = 1;
-            counter_.count(0); // Hash collision count
+            counter_.count(1); // Hash collision count
           }
 
           if (meta.is_hash_collision == 0) {
             if (meta.is_first == 1) {//shouldn't happen!
               reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.dstAddr);
-              reg_srcport.write((bit<32>)meta.register_index, meta.srcport);
-              reg_dstport.write((bit<32>)meta.register_index, meta.dstport);
-              counter_.count(3); // Flows count
+              reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
+              reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
+              counter_.count(2); // Flows count
             }
 
             reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
@@ -685,6 +688,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }
 
         if (meta.is_hash_collision == 0) {
+          counter_.count(8);
           reg_time_first_pkt.read(meta.time_first_pkt, (bit<32>)meta.register_index);
           meta.dur = standard_metadata.ingress_global_timestamp - meta.time_first_pkt;
 
@@ -714,7 +718,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             }
           }
         }//hash collision check
-      }
+      } else {
+        counter_.count(9);
+      };
 
       if (meta.class == SEND_TO_ORACLE){
         send_to_oracle();
@@ -723,20 +729,14 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         if(meta.class == 0) {
           standard_metadata.egress_spec = 771;
           hdr.ipv4.ecn = 0;
-          counter_.count(2); // Malware
-          if (meta.is_first == 1) {
-            counter_.count(4); // Malware flows count
-          };
-        } else {
+          counter_.count(4); // Malware
+        } else if (meta.class == 1){
           standard_metadata.egress_spec = 770;
           hdr.ipv4.ecn = 1;
-        }
-
-        hdr.ipv4.dstAddr = (bit<32>) standard_metadata.ingress_global_timestamp;
-        hdr.ipv4.srcAddr = (bit<32>) meta.time_first_pkt;
-        hdr.ipv4.dSField = (bit<6>) meta.dur;
-
-        //ipv4_exact.apply();
+          counter_.count(3); // Not Malware
+        } else {
+          counter_.count(6); // Not assigned
+        };
       }
     }
   }
