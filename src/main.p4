@@ -123,6 +123,9 @@ struct metadata {
   bit<64> feature11;
   bit<64> feature12;
   bit<1>  first_ack;
+  bit<16> hdr_dstport;
+  bit<16> hdr_srcport;
+  bit<32> hdr_srcip;
   bit<16> isTrue;
   bit<1>  is_first;
   bit<1>  is_hash_collision;
@@ -555,13 +558,13 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         if (meta.direction == 1) {
           if (hdr.ipv4.protocol == 6) {
             get_register_index_tcp();
-            meta.srcport = hdr.tcp.srcPort;
-            meta.dstport = hdr.tcp.dstPort;
+            meta.hdr_srcport = hdr.tcp.srcPort;
+            meta.hdr_dstport = hdr.tcp.dstPort;
           }
           else {
             get_register_index_udp();
-            meta.srcport = hdr.udp.srcPort;
-            meta.dstport = hdr.udp.dstPort;
+            meta.hdr_srcport = hdr.udp.srcPort;
+            meta.hdr_dstport = hdr.udp.dstPort;
           }
 
           //read_reg_to_check_collision srcip, srcport, dstport
@@ -572,8 +575,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           if (meta.srcip == 0) {//It was an empty register
             meta.is_first = 1;
           }
-          else if (meta.srcip != hdr.ipv4.srcAddr || meta.srcport != meta.srcport
-              || meta.dstport != meta.dstport) {
+          else if (meta.srcip != hdr.ipv4.srcAddr || meta.hdr_srcport != meta.srcport
+              || meta.hdr_dstport != meta.dstport) {
             //Hash collision!
             //TODO handle hash collisions in a better way!
             meta.is_hash_collision = 1;
@@ -585,8 +588,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
               meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
               reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
               reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.srcAddr);
-              reg_srcport.write((bit<32>)meta.register_index, meta.srcport);
-              reg_dstport.write((bit<32>)meta.register_index, meta.dstport);
+              reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
+              reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
             }
 
             reg_spkts.read(meta.spkts, (bit<32>)meta.register_index);
@@ -634,13 +637,13 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         else {//direction = 0
           if (hdr.ipv4.protocol == 6) {
             get_register_index_inverse_tcp();
-            meta.srcport = hdr.tcp.dstPort;//its inverse
-            meta.dstport = hdr.tcp.srcPort;
+            meta.hdr_srcport = hdr.tcp.dstPort;//its inverse
+            meta.hdr_dstport = hdr.tcp.srcPort;
           }
           else {
             get_register_index_inverse_udp();
-            meta.srcport = hdr.udp.dstPort;
-            meta.dstport = hdr.udp.srcPort;
+            meta.hdr_srcport = hdr.udp.dstPort;
+            meta.hdr_dstport = hdr.udp.srcPort;
           }
 
           meta.register_index = meta.register_index_inverse;
@@ -652,8 +655,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           if (meta.srcip == 0) {//It was an empty register
             meta.is_first = 1;
           }
-          else if (meta.srcip != hdr.ipv4.dstAddr || meta.srcport != meta.srcport
-              || meta.dstport != meta.dstport) {
+          else if (meta.srcip != hdr.ipv4.dstAddr || meta.hdr_srcport != meta.srcport
+              || meta.hdr_dstport != meta.dstport) {
             //Hash collision!
             //TODO handle hash collisions in a better way!
             meta.is_hash_collision = 1;
@@ -663,8 +666,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           if (meta.is_hash_collision == 0) {
             if (meta.is_first == 1) {//shouldn't happen!
               reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.dstAddr);
-              reg_srcport.write((bit<32>)meta.register_index, meta.srcport);
-              reg_dstport.write((bit<32>)meta.register_index, meta.dstport);
+              reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
+              reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
               counter_.count(3); // Flows count
             }
 
