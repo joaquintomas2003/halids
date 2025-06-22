@@ -107,6 +107,18 @@ class ExportRulesP4():
                 _add_leaf(value, class_name, "", prevfeature, result, depth, previous_id)
 
         print_tree_recurse(0, 1, 0, 1, self.global_id)
+
+        match = {"ipv4.dstAddr": {"value": "149.171.126.0/24"}}
+        action = {"type": "ingress::SetDirection"}
+
+        direction_text = (
+            "/opt/netronome/p4/bin/rtecli tables add "
+            "--table-name ingress::direction "
+            "--rule set_direction_to_inside "
+            f"--match '{json.dumps(match)}' "
+            f"--action '{json.dumps(action)}'"
+        )
+        f.write(direction_text+"\n")
         f.close()
 
     def generate_rules(self):
