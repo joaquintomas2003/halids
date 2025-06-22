@@ -598,7 +598,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
             //read_sbytes also used for sload
             reg_sbytes.read(meta.sbytes, (bit<32>)meta.register_index);
-            meta.sbytes = meta.sbytes + standard_metadata.packet_length - 14;
+            meta.sbytes = meta.sbytes + (bit<32>)standard_metadata.packet_length - 14;
             reg_sbytes.write((bit<32>)meta.register_index, meta.sbytes);
 
             // tcprtt
@@ -673,7 +673,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             reg_dpkts.write((bit<32>)meta.register_index, meta.dpkts);
 
             reg_dbytes.read(meta.dbytes, (bit<32>)meta.register_index);
-            meta.dbytes = meta.dbytes + standard_metadata.packet_length - 14;
+            meta.dbytes = meta.dbytes + (bit<32>)standard_metadata.packet_length - 14;
             reg_dbytes.write((bit<32>)meta.register_index, meta.dbytes);
 
             meta.dttl =  hdr.ipv4.ttl;
