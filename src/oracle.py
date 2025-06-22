@@ -1,4 +1,4 @@
-from scapy.all import sniff, Raw
+from scapy.all import sniff, Raw, sendp, Raw
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -18,6 +18,38 @@ csv_file_name_for_retrain = "ml_data/predicted_labels_oracle.csv"
 
 def get_u64(payload, offset, length=8):
     return int.from_bytes(payload[offset:offset+length], byteorder="big")
+
+def build_packet_out_header(packet_type, opcode, flow_hash, label, malware, is_first, reserved=0):
+    header = b''
+
+    header += int(packet_type).to_bytes(1, 'big')
+    header += int(opcode).to_bytes(1, 'big')
+    header += int(flow_hash).to_bytes(4, 'big')
+    header += int(label).to_bytes(2, 'big')
+    last_byte = ((malware & 0x1) << 7) | ((is_first & 0x1) << 6) | (reserved & 0x3F)
+    header += last_byte.to_bytes(1, 'big')
+
+    return header  # total: 9 bytes
+
+def send_packet_out(self, original_pkt, flow_hash, predicted_label, malware, is_first):
+    packet_type = 2
+    opcode = 2
+
+    pkt_out_header = build_packet_out_header(
+        packet_type=packet_type,
+        opcode=opcode,
+        flow_hash=flow_hash,
+        label=predicted_label,
+        malware=malware,
+        is_first=is_first,
+        reserved=0
+    )
+
+    payload = bytes(original_pkt)
+
+    out_pkt = Ether(src=original_pkt[Ether].src, dst=original_pkt[Ether].dst) / Raw(load=payload + pkt_out_header)
+
+    sendp(out_pkt, iface="vf0_0", verbose=False)
 
 class Oracle():
     CPU_PORT = 510
@@ -201,6 +233,8 @@ class Oracle():
 
         prediction = self.rf.predict([features_fit])[0]
         print(f"Predicted label: {prediction}, Malware: {malware}, First: {is_first}")
+
+        self.send_packet_out(pkt, flow_hash, int(prediction), malware, is_first)
 
         with open('ml_data/predicted_labels_oracle.csv', 'a') as f:
             writer = csv.writer(f)
