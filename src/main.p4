@@ -27,7 +27,9 @@ typedef bit<16> egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 
-extern void set_ingress_timestamp();
+struct intrinsic_metadata_t {
+  bit<64> ingress_global_timestamp;
+}
 
 header ethernet_t {
   macAddr_t dstAddr;
@@ -109,7 +111,7 @@ struct metadata {
   bit<32> dpkts;
   bit<16> dstport;
   bit<8>  dttl;
-  bit<48> dur;
+  bit<64> dur;
   bit<64> feature1;
   bit<64> feature2;
   bit<64> feature3;
@@ -139,9 +141,10 @@ struct metadata {
   bit<16> srcport;
   bit<8>  state;
   bit<8>  sttl;
-  bit<48> syn_time;
-  bit<48> tcprtt;
-  bit<48> time_first_pkt;
+  bit<64> syn_time;
+  bit<64> tcprtt;
+  bit<64> time_first_pkt;
+  intrinsic_metadata_t intrinsic_metadata;
 }
 
 struct headers {
@@ -215,9 +218,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_spkts;
   register<bit<32>>(MAX_REGISTER_ENTRIES) reg_srcip;
   register<bit<16>>(MAX_REGISTER_ENTRIES) reg_srcport;
-  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_syn_time;
-  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_tcprtt;
-  register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
+  register<bit<64>>(MAX_REGISTER_ENTRIES) reg_syn_time;
+  register<bit<64>>(MAX_REGISTER_ENTRIES) reg_tcprtt;
+  register<bit<64>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
   register<bit<8>>(MAX_REGISTER_ENTRIES)  reg_ttl;
 
   counter(15, CounterType.packets) counter_;
@@ -554,8 +557,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
     meta.class = CLASS_NOT_SET;
 
-    set_ingress_timestamp();
-
     //TODO: if (hdr.packet_out.isValid()) meant for packets from controller
 
     if (hdr.ipv4.isValid()) {
@@ -597,7 +598,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
           if (meta.is_hash_collision == 0) {
             if (meta.is_first == 1) {
-              meta.time_first_pkt = standard_metadata.ingress_global_timestamp;
+              meta.time_first_pkt = meta.intrinsic_metadata.ingress_global_timestamp;
               reg_time_first_pkt.write((bit<32>)meta.register_index, meta.time_first_pkt);
               reg_srcip.write((bit<32>)meta.register_index, hdr.ipv4.srcAddr);
               reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
@@ -623,7 +624,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             // tcprtt
             //SYN TIME
             if ((hdr.tcp.ack != (bit<1>)1)&&(hdr.tcp.syn == (bit<1>)1)) {//this is a SYN
-              reg_syn_time.write((bit<32>)meta.register_index, standard_metadata.ingress_global_timestamp);
+              reg_syn_time.write((bit<32>)meta.register_index, meta.intrinsic_metadata.ingress_global_timestamp);
             }
             //ACK + SYN time
             else if ((hdr.tcp.ack == (bit<1>)1)&&(hdr.tcp.syn != (bit<1>)1)) {//this is an ACK
@@ -634,7 +635,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
                 reg_syn_time.read(meta.syn_time, (bit<32>)meta.register_index);
 
                 if (meta.syn_time > 0) {//There was a syn before
-                  meta.tcprtt = standard_metadata.ingress_global_timestamp - meta.syn_time;
+                  meta.tcprtt = meta.intrinsic_metadata.ingress_global_timestamp - meta.syn_time;
                   reg_tcprtt.write((bit<32>)meta.register_index, meta.tcprtt);
                   //no longer a first ack
                   reg_first_ack.write((bit<32>)meta.register_index, 1);
@@ -706,7 +707,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         if (meta.is_hash_collision == 0) {
           counter_.count(8);
           reg_time_first_pkt.read(meta.time_first_pkt, (bit<32>)meta.register_index);
-          meta.dur = standard_metadata.ingress_global_timestamp - meta.time_first_pkt;
+          meta.dur = meta.intrinsic_metadata.ingress_global_timestamp - meta.time_first_pkt;
 
           calc_state();
           calc_ct_state_ttl();
