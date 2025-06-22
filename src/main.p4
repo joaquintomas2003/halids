@@ -111,19 +111,19 @@ struct metadata {
   bit<32> dpkts;
   bit<16> dstport;
   bit<8>  dttl;
-  bit<64> dur;
-  bit<64> feature1;
-  bit<64> feature2;
-  bit<64> feature3;
-  bit<64> feature4;
-  bit<64> feature5;
-  bit<64> feature6;
-  bit<64> feature7;
-  bit<64> feature8;
-  bit<64> feature9;
-  bit<64> feature10;
-  bit<64> feature11;
-  bit<64> feature12;
+  bit<32> dur;
+  bit<32> feature1;
+  bit<32> feature2;
+  bit<32> feature3;
+  bit<32> feature4;
+  bit<32> feature5;
+  bit<32> feature6;
+  bit<32> feature7;
+  bit<32> feature8;
+  bit<32> feature9;
+  bit<32> feature10;
+  bit<32> feature11;
+  bit<32> feature12;
   bit<1>  first_ack;
   bit<16> hdr_dstport;
   bit<16> hdr_srcport;
@@ -331,32 +331,24 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       meta.ct_state_ttl = 0;
     }
   }
-
-  action ipv4_forward(egressSpec_t port) {
-    standard_metadata.egress_spec = port;
-    //hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
-    //hdr.ethernet.dstAddr = dstAddr;
-    hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
-  }
-
   action init_features(){
-    meta.feature1 = (bit<64>)meta.sttl;
-    meta.feature2 = (bit<64>)meta.ct_state_ttl;
-    meta.feature3 = (bit<64>)meta.dttl;
-    // meta.feature4 = (bit<64>)(meta.sbytes * (meta.spkts - 1) * 8);
-    meta.feature5 = (bit<64>)meta.dpkts;
-    meta.feature6 = (bit<64>)meta.dbytes;
-    meta.feature7 = (bit<64>)meta.sbytes;
-    // meta.feature8 = (bit<64>)(meta.dbytes * (meta.dpkts - 1) * 8);
-    meta.feature9 = (bit<64>)meta.sbytes;
-    meta.feature10 = (bit<64>)meta.tcprtt;
-    meta.feature11 = (bit<64>)meta.dstport;
-    meta.feature12 = (bit<64>)meta.dur;
+    meta.feature1 = (bit<32>)meta.sttl;
+    meta.feature2 = (bit<32>)meta.ct_state_ttl;
+    meta.feature3 = (bit<32>)meta.dttl;
+    meta.feature4 = meta.sbytes * (meta.spkts - 1) * 8;
+    meta.feature5 = meta.dpkts;
+    meta.feature6 = meta.dbytes;
+    meta.feature7 = meta.sbytes;
+    meta.feature8 = meta.dbytes * (meta.dpkts - 1) * 8;
+    meta.feature9 = meta.sbytes;
+    meta.feature10 = (bit<32>)meta.tcprtt;
+    meta.feature11 = (bit<32>)meta.dstport;
+    meta.feature12 = meta.dur;
   }
 
-  action CheckFeature(bit<16> node_id, bit<16> f_inout, bit<64> threshold) {
-    bit<64> feature = 0;
-    bit<64> th = threshold;
+  action CheckFeature(bit<16> node_id, bit<16> f_inout, bit<32> threshold) {
+    bit<32> feature = 0;
+    bit<32> th = threshold;
     bit<16> f = f_inout + 1;
     counter_.count(13);
 
@@ -370,27 +362,29 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
       feature = meta.feature3;
     }
     else if (f==4){
-      // feature = meta.feature4 * 1000000;
-      // th = th*(bit<64>)meta.dur * (bit<64>)meta.sbytes;
+      feature = meta.feature4 * 1000000;
+      bit<32> th_aux = th * meta.dur;
+      th = th_aux * meta.sbytes;
     }
     else if (f==5){
       feature = meta.feature5;
     }
     else if (f==6){
       feature = meta.feature6;
-      // th = th * (bit<64>) meta.dpkts;
+      th = th * meta.dpkts;
     }
     else if (f==7){
       feature = meta.feature7;
-      // th = th * (bit<64>) meta.dpkts;
+      th = th * meta.dpkts;
     }
     else if (f==8){
-      // feature = meta.feature8 * 1000000;
-      // th = th * (bit<64>)meta.dur * (bit<64>)meta.sbytes;
+      feature = meta.feature8 * 1000000;
+      bit<32> th_aux = th * meta.dur;
+      th = th_aux * meta.sbytes;
     }
     else if (f==9){
       feature = meta.feature9;
-      // th = th * (bit<64>)meta.spkts;
+      th = th * meta.spkts;
     }
     else if (f==10){
       feature = meta.feature10;
@@ -412,18 +406,18 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   action send_to_oracle() {
     hdr.features.setValid();
 
-    hdr.features.feature1 = meta.feature1;
-    hdr.features.feature2 = meta.feature2;
-    hdr.features.feature3 = meta.feature3;
-    hdr.features.feature4 = meta.feature4;
-    hdr.features.feature5 = meta.feature5;
-    hdr.features.feature6 = meta.feature6;
-    hdr.features.feature7 = meta.feature7;
-    hdr.features.feature8 = meta.feature8;
-    hdr.features.feature9 = meta.feature9;
-    hdr.features.feature10 = meta.feature10;
-    hdr.features.feature11 = meta.feature11;
-    hdr.features.feature12 = meta.feature12;
+    hdr.features.feature1 = (bit<64>)meta.feature1;
+    hdr.features.feature2 = (bit<64>)meta.feature2;
+    hdr.features.feature3 = (bit<64>)meta.feature3;
+    hdr.features.feature4 = (bit<64>)meta.feature4;
+    hdr.features.feature5 = (bit<64>)meta.feature5;
+    hdr.features.feature6 = (bit<64>)meta.feature6;
+    hdr.features.feature7 = (bit<64>)meta.feature7;
+    hdr.features.feature8 = (bit<64>)meta.feature8;
+    hdr.features.feature9 = (bit<64>)meta.feature9;
+    hdr.features.feature10 = (bit<64>)meta.feature10;
+    hdr.features.feature11 = (bit<64>)meta.feature11;
+    hdr.features.feature12 = (bit<64>)meta.feature12;
 
     hdr.features.dur     = (bit<64>)meta.dur;
     hdr.features.sbytes  = (bit<64>)meta.sbytes;
@@ -534,20 +528,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     size = 1024;
   }
 
-  /* This will send the packet to a specifique port of the switch for output*/
-  table ipv4_exact {
-    key = {
-      meta.class: exact;
-    }
-    actions = {
-      ipv4_forward;
-      drop;
-      NoAction;
-    }
-    size = 1024;
-    default_action = drop();
-  }
-
   apply {
     meta.direction = 0;
 
@@ -618,7 +598,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
             //read_sbytes also used for sload
             reg_sbytes.read(meta.sbytes, (bit<32>)meta.register_index);
-            // meta.sbytes = meta.sbytes + standard_metadata.packet_length - 14;
+            meta.sbytes = meta.sbytes + standard_metadata.packet_length - 14;
             reg_sbytes.write((bit<32>)meta.register_index, meta.sbytes);
 
             // tcprtt
@@ -693,7 +673,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             reg_dpkts.write((bit<32>)meta.register_index, meta.dpkts);
 
             reg_dbytes.read(meta.dbytes, (bit<32>)meta.register_index);
-            // meta.dbytes = meta.dbytes + standard_metadata.packet_length - 14;
+            meta.dbytes = meta.dbytes + standard_metadata.packet_length - 14;
             reg_dbytes.write((bit<32>)meta.register_index, meta.dbytes);
 
             meta.dttl =  hdr.ipv4.ttl;
@@ -707,7 +687,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         if (meta.is_hash_collision == 0) {
           counter_.count(8);
           reg_time_first_pkt.read(meta.time_first_pkt, (bit<32>)meta.register_index);
-          meta.dur = meta.intrinsic_metadata.ingress_global_timestamp - meta.time_first_pkt;
+          meta.dur = (bit<32>)(meta.intrinsic_metadata.ingress_global_timestamp - meta.time_first_pkt);
 
           calc_state();
           calc_ct_state_ttl();
