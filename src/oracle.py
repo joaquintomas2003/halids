@@ -16,8 +16,8 @@ from train_sw import TrainSwitch
 
 csv_file_name_for_retrain = "ml_data/predicted_labels_oracle.csv"
 
-def get_u64(payload, offset):
-    return int.from_bytes(payload[offset:offset+8], byteorder="big")
+def get_u64(payload, offset, length=8):
+    return int.from_bytes(payload[offset:offset+length], byteorder="big")
 
 class Oracle():
     CPU_PORT = 510
@@ -136,8 +136,11 @@ class Oracle():
             print(f"Payload too short ({len(payload)} bytes). Expected 136.")
             return
 
+        packet_type = get_u64(payload, 0, 1)
+        opcode = get_u64(payload, 1, 1)
+        flow_hash = get_u64(payload, 2, 4)
+
         base = 6 # 6 bytes from packet_type, opcode and flow_hash
-        # TODO: Mandarlos de p4 y contrastar los valores con un print
         dur_value = get_u64(payload, base + 96)
         sbytes_value = get_u64(payload, base + 104)
         dpkts_value = get_u64(payload, base + 112)
