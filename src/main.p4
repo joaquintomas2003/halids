@@ -145,6 +145,7 @@ struct metadata {
   bit<64> tcprtt;
   bit<64> time_first_pkt;
   intrinsic_metadata_t intrinsic_metadata;
+  bit<1> checked_feature;
 }
 
 struct headers {
@@ -223,7 +224,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<64>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
   register<bit<8>>(MAX_REGISTER_ENTRIES)  reg_ttl;
 
-  counter(15, CounterType.packets) counter_;
+  counter(13, CounterType.packets) counter_;
 
   action init_register() {
     reg_dbytes.write(meta.register_index, 0);
@@ -350,7 +351,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     bit<32> feature = 0;
     bit<32> th = threshold;
     bit<16> f = f_inout + 1;
-    counter_.count(13);
+    counter_.count(2);
+    meta.checked_feature = 1;
 
     if (f==1){
       feature = meta.feature1;
@@ -399,6 +401,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     if(feature <= th) meta.isTrue = 1;
     else meta.isTrue = 0;
 
+    meta.isTrue = 1;
+
     meta.prevFeature = f_inout;
     meta.node_id = node_id;
   }
@@ -431,7 +435,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
   action SetClass(bit<16> node_id, bit<16> class, bit<8> certainty) {
     meta.node_id = node_id;
-    counter_.count(12);
+    counter_.count(3);
 
     if (certainty > THRESHOLD_CERTAINTY) {
       meta.class = class;
@@ -444,7 +448,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   action SetDirection() {
     //need just for this setting as tcpreplay is sending all the packets to same interface
     meta.direction = 1;
-    counter_.count(11);
   }
 
   table direction{
@@ -540,15 +543,11 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     //TODO: if (hdr.packet_out.isValid()) meant for packets from controller
 
     if (hdr.ipv4.isValid()) {
-      counter_.count(1);
-
       if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6) {//We treat only TCP or UDP packets (and ICMP for testing)
-        counter_.count(14);
+        counter_.count(1);
         meta.is_hash_collision = 0;
 
         if (meta.direction == 1) {
-          counter_.count(9);
-
           if (hdr.ipv4.protocol == 6) {
             get_register_index_tcp();
             meta.hdr_srcport = hdr.tcp.srcPort;
@@ -573,7 +572,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             //Hash collision!
             //TODO handle hash collisions in a better way!
             meta.is_hash_collision = 1;
-            counter_.count(3); // Hash collision count
           }
 
           if (meta.is_hash_collision == 0) {
@@ -584,8 +582,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
               reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
               reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
             }
-
-            counter_.count(4);
 
             reg_spkts.read(meta.spkts, (bit<32>)meta.register_index);
             meta.spkts = meta.spkts + 1;
@@ -630,7 +626,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }//end of direction = 1
 
         else {//direction = 0
-          counter_.count(10);
           if (hdr.ipv4.protocol == 6) {
             get_register_index_inverse_tcp();
             meta.hdr_srcport = hdr.tcp.dstPort;//its inverse
@@ -656,7 +651,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             //Hash collision!
             //TODO handle hash collisions in a better way!
             meta.is_hash_collision = 1;
-            counter_.count(3); // Hash collision count
           }
 
           if (meta.is_hash_collision == 0) {
@@ -665,8 +659,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
               reg_srcport.write((bit<32>)meta.register_index, meta.hdr_srcport);
               reg_dstport.write((bit<32>)meta.register_index, meta.hdr_dstport);
             }
-
-            counter_.count(4);
 
             reg_dpkts.read(meta.dpkts, (bit<32>)meta.register_index);
             meta.dpkts = meta.dpkts + 1;
@@ -685,7 +677,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }
 
         if (meta.is_hash_collision == 0) {
-          counter_.count(8);
           reg_time_first_pkt.read(meta.time_first_pkt, (bit<32>)meta.register_index);
           meta.dur = (bit<32>)(meta.intrinsic_metadata.ingress_global_timestamp - meta.time_first_pkt);
 
@@ -701,15 +692,36 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
           //TODO if malware
 
+          meta.checked_feature = 0;
           level1.apply();
+          if (meta.checked_feature == 1){
+            counter_.count(8);
+            meta.checked_feature = 0;
+          }
           if (meta.class == CLASS_NOT_SET) {
             level2.apply();
+            if (meta.checked_feature == 1){
+              counter_.count(9);
+              meta.checked_feature = 0;
+            }
             if (meta.class == CLASS_NOT_SET) {
               level3.apply();
+              if (meta.checked_feature == 1){
+                counter_.count(10);
+                meta.checked_feature = 0;
+              }
               if (meta.class == CLASS_NOT_SET) {
                 level4.apply();
+                if (meta.checked_feature == 1){
+                  counter_.count(11);
+                  meta.checked_feature = 0;
+                }
                 if (meta.class == CLASS_NOT_SET) {
                   level5.apply();
+                  if (meta.checked_feature == 1){
+                    counter_.count(12);
+                    meta.checked_feature = 0;
+                  }
                 }
               }
             }
@@ -718,20 +730,18 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
         if (meta.class == SEND_TO_ORACLE){
           send_to_oracle();
-          counter_.count(7); // Send to oracle count
+          counter_.count(4); // Send to oracle count
         }else if(meta.class == 0) {
           standard_metadata.egress_spec = 771;
           hdr.ipv4.ecn = 0;
-          counter_.count(6); // Malware
+          counter_.count(5); // Malware
         } else if (meta.class == 1){
           standard_metadata.egress_spec = 770;
           hdr.ipv4.ecn = 1;
-          counter_.count(5); // Not Malware
+          counter_.count(6); // Not Malware
         } else {
-          counter_.count(8); // Not assigned
+          counter_.count(7); // Not assigned
         };
-      } else {
-        counter_.count(2);
       }
     }
   }
