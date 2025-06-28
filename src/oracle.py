@@ -1,4 +1,4 @@
-from scapy.all import sniff, Raw, sendp, Raw
+from scapy.all import sniff, Raw, sendp, Raw, Ether
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -31,7 +31,7 @@ def build_packet_out_header(packet_type, opcode, flow_hash, label, malware, is_f
 
     return header  # total: 9 bytes
 
-def send_packet_out(self, original_pkt, flow_hash, predicted_label, malware, is_first):
+def send_packet_out(original_pkt, flow_hash, predicted_label, malware, is_first):
     packet_type = 2
     opcode = 2
 
@@ -234,7 +234,7 @@ class Oracle():
         prediction = self.rf.predict([features_fit])[0]
         print(f"Predicted label: {prediction}, Malware: {malware}, First: {is_first}")
 
-        self.send_packet_out(pkt, flow_hash, int(prediction), malware, is_first)
+        send_packet_out(pkt, flow_hash, int(prediction), malware, is_first)
 
         with open('ml_data/predicted_labels_oracle.csv', 'a') as f:
             writer = csv.writer(f)
