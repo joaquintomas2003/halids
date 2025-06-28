@@ -3,7 +3,7 @@
 #include <v1model.p4>
 
 const bit<16> TYPE_IPV4 = 0x800;
-#define CLASS_NOT_SET 10000// A big number
+#define CLASS_NOT_SET 10 // A big number
 #define MAX_REGISTER_ENTRIES 32768
 
 #define STATE_INT 1
@@ -224,7 +224,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<64>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
   register<bit<8>>(MAX_REGISTER_ENTRIES)  reg_ttl;
 
-  counter(13, CounterType.packets) counter_;
+  counter(17, CounterType.packets) counter_;
 
   action init_register() {
     reg_dbytes.write(meta.register_index, 0);
@@ -693,35 +693,46 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           //TODO if malware
 
           meta.checked_feature = 0;
+          if (meta.node_id == 0 && meta.isTrue == 1 && meta.prevFeature == 0){
+            counter_.count(8);
+          }
           level1.apply();
           if (meta.checked_feature == 1){
-            counter_.count(8);
+            counter_.count(9);
             meta.checked_feature = 0;
           }
           if (meta.class == CLASS_NOT_SET) {
+            if (meta.node_id == 1 && meta.isTrue == 1 && meta.prevFeature == 9){
+              counter_.count(10);
+            }
             level2.apply();
             if (meta.checked_feature == 1){
-              counter_.count(9);
+              counter_.count(11);
               meta.checked_feature = 0;
             }
             if (meta.class == CLASS_NOT_SET) {
+              if (meta.node_id == 2 && meta.isTrue == 1 && meta.prevFeature == 4){
+                counter_.count(12);
+              }
               level3.apply();
               if (meta.checked_feature == 1){
-                counter_.count(10);
+                counter_.count(13);
                 meta.checked_feature = 0;
               }
               if (meta.class == CLASS_NOT_SET) {
+                if (meta.node_id == 3 && meta.isTrue == 1 && meta.prevFeature == 1){
+                  counter_.count(14);
+                }
                 level4.apply();
                 if (meta.checked_feature == 1){
-                  counter_.count(11);
+                  counter_.count(15);
                   meta.checked_feature = 0;
                 }
                 if (meta.class == CLASS_NOT_SET) {
-                  level5.apply();
-                  if (meta.checked_feature == 1){
-                    counter_.count(12);
-                    meta.checked_feature = 0;
+                  if (meta.node_id == 4 && meta.isTrue == 1 && meta.prevFeature == 10){
+                    counter_.count(16);
                   }
+                  level5.apply();
                 }
               }
             }
