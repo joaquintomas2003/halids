@@ -166,6 +166,8 @@ struct metadata {
   bit<48> syn_time;
   bit<48> tcprtt;
   bit<48> time_first_pkt;
+  bit<1> malware;
+  bit<1> marked_malware;
 }
 
 struct headers {
@@ -173,8 +175,8 @@ struct headers {
   ipv4_t       ipv4;
   tcp_t        tcp;
   udp_t        udp;
-  packet_in_header_t packet_in;
-  packet_out_header_t packet_out;
+  packet_in_header_t packet_in_hdr;
+  packet_out_header_t packet_out_hdr;
 }
 
 /*************************************************************************
@@ -187,7 +189,20 @@ parser MyParser(packet_in packet,
     inout standard_metadata_t standard_metadata) {
 
   state start {
-    transition parse_ethernet;
+    transition parse_sender;
+  }
+
+  state parse_sender {
+    transition select(standard_metadata.ingress_port) {
+      CPU_PORT: parse_packet_oracle; // packet received from the oracle with prediction
+      default: parse_ethernet;
+    }
+  }
+
+  state parse_packet_oracle {
+    // extract hdr that contains predicted label by oracle
+    packet.extract(hdr.packet_out_hdr);
+    transition accept;
   }
 
   state parse_ethernet {
@@ -244,6 +259,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<48>>(MAX_REGISTER_ENTRIES) reg_tcprtt;
   register<bit<48>>(MAX_REGISTER_ENTRIES) reg_time_first_pkt;
   register<bit<8>>(MAX_REGISTER_ENTRIES)  reg_ttl;
+  register<bit<1>>(MAX_REGISTER_ENTRIES) reg_marked_malware;
+
 
   counter(15, CounterType.packets) counter_;
 
@@ -259,6 +276,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     reg_syn_time.write(meta.register_index, 0);
     reg_tcprtt.write(meta.register_index, 0);
     reg_ttl.write(meta.register_index, 0);
+    reg_marked_malware.write(meta.register_index, 0);
   }
 
   action get_register_index_tcp() {
@@ -433,36 +451,36 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
   action send_to_oracle() {
     // header to send packet to controller
-    hdr.packet_in.setValid();
+    hdr.packet_in_hdr.setValid();
 
     // set egress port to CPU PORT
     standard_metadata.egress_spec = CPU_PORT;
-    hdr.packet_in.packet_type = PACKET_TYPE_IN; // metadata id 1
-    hdr.packet_in.opcode = OPCODE_SEND_FEATURES; // id 2
+    hdr.packet_in_hdr.packet_type = PACKET_TYPE_IN; // metadata id 1
+    hdr.packet_in_hdr.opcode = OPCODE_SEND_FEATURES; // id 2
 
     // features to send to the controller
-    hdr.packet_in.flow_hash = meta.register_index; // id 3
-    hdr.packet_in.feature1 = meta.feature1; // id 4
-    hdr.packet_in.feature2 = meta.feature2;
-    hdr.packet_in.feature3 = meta.feature3;
-    hdr.packet_in.feature4 = meta.feature4;
-    hdr.packet_in.feature5 = meta.feature5;
-    hdr.packet_in.feature6 = meta.feature6;
-    hdr.packet_in.feature7 = meta.feature7;
-    hdr.packet_in.feature8 = meta.feature8;
-    hdr.packet_in.feature9 = meta.feature9;
-    hdr.packet_in.feature10 = meta.feature10;
-    hdr.packet_in.feature11 = meta.feature11;
-    hdr.packet_in.feature12 = meta.feature12;  // id 15
+    hdr.packet_in_hdr.flow_hash = meta.register_index; // id 3
+    hdr.packet_in_hdr.feature1 = meta.feature1; // id 4
+    hdr.packet_in_hdr.feature2 = meta.feature2;
+    hdr.packet_in_hdr.feature3 = meta.feature3;
+    hdr.packet_in_hdr.feature4 = meta.feature4;
+    hdr.packet_in_hdr.feature5 = meta.feature5;
+    hdr.packet_in_hdr.feature6 = meta.feature6;
+    hdr.packet_in_hdr.feature7 = meta.feature7;
+    hdr.packet_in_hdr.feature8 = meta.feature8;
+    hdr.packet_in_hdr.feature9 = meta.feature9;
+    hdr.packet_in_hdr.feature10 = meta.feature10;
+    hdr.packet_in_hdr.feature11 = meta.feature11;
+    hdr.packet_in_hdr.feature12 = meta.feature12;  // id 15
 
     // needed to calculate some features at the oracle (in the data plane the treshold is changed)
-    hdr.packet_in.dur = (bit<64>)meta.dur;  // id 16
-    hdr.packet_in.sbytes = (bit<64>)meta.sbytes; // id 17
-    hdr.packet_in.dpkts = (bit<64>)meta.dpkts;  // id 18
-    hdr.packet_in.spkts = (bit<64>)meta.spkts;  // id 19
-    hdr.packet_in.malware = 0; // send priori knowledge of malware
-    hdr.packet_in.is_first = meta.is_first;
-    hdr.packet_in.reserved = 0;
+    hdr.packet_in_hdr.dur = (bit<64>)meta.dur;  // id 16
+    hdr.packet_in_hdr.sbytes = (bit<64>)meta.sbytes; // id 17
+    hdr.packet_in_hdr.dpkts = (bit<64>)meta.dpkts;  // id 18
+    hdr.packet_in_hdr.spkts = (bit<64>)meta.spkts;  // id 19
+    hdr.packet_in_hdr.malware = meta.malware; // send priori knowledge of malware
+    hdr.packet_in_hdr.is_first = meta.is_first;
+    hdr.packet_in_hdr.reserved = 0;
   }
 
   action SetClass(bit<16> node_id, bit<16> class, bit<8> certainty) {
@@ -481,6 +499,11 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     //need just for this setting as tcpreplay is sending all the packets to same interface
     meta.direction = 1;
     counter_.count(11);
+  }
+
+  action SetMalware() {
+    //need just for this setting as tcpreplay is sending all the packets to same interface
+    meta.malware = 1;
   }
 
   table direction{
@@ -589,9 +612,43 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
     set_ingress_timestamp();
 
-    //TODO: if (hdr.packet_out.isValid()) meant for packets from controller
+    // packets sent from the controller with predicted label by oracle
+    if (hdr.packet_out_hdr.isValid()) {
+      // obtain predicted label from controller
+      meta.class = (bit<16>) hdr.packet_out_hdr.label;
 
-    if (hdr.ipv4.isValid()) {
+      // obtain flow id (hash)
+      meta.register_index = (bit<32>) hdr.packet_out_hdr.flow_hash;
+
+      // obtain priori knowledge
+      meta.malware = (bit<1>) hdr.packet_out_hdr.malware;
+      meta.is_first = (bit<1>) hdr.packet_out_hdr.is_first;
+      reg_marked_malware.read(meta.marked_malware, (bit<32>)meta.register_index);
+      if (meta.marked_malware == 1){
+        meta.class = 1;
+      }
+
+      if (meta.malware == 1) {// meta.malware is calculated with priori knowledge for statistics
+        if(meta.class == 1) { // true positive - class=1 malware=1
+          reg_marked_malware.write((bit<32>)meta.register_index,1);
+        }
+      }
+      else { // malware == 0
+        if(meta.class == 1) { // false positive - class=1 malware=0
+          reg_marked_malware.write((bit<32>)meta.register_index,1);
+        }
+      }
+
+      if(meta.class == 0) {
+        standard_metadata.egress_spec = 771;
+        hdr.ipv4.ecn = 0;
+      } else if (meta.class == 1){
+        standard_metadata.egress_spec = 770;
+        hdr.ipv4.ecn = 1;
+      }
+    }
+
+    else if (hdr.ipv4.isValid()) {
       counter_.count(1);
 
       if (hdr.ipv4.protocol == 1 || hdr.ipv4.protocol == 6) {//We treat only TCP or UDP packets (and ICMP for testing)
@@ -751,22 +808,44 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           meta.prevFeature = 0;
           meta.isTrue = 1;
 
-          //TODO if malware
+          reg_marked_malware.read(meta.marked_malware, (bit<32>)meta.register_index);
 
-          level1.apply();
-          if (meta.class == CLASS_NOT_SET) {
-            level2.apply();
+          //TODO if malware
+          if (meta.marked_malware == 1) {
+            meta.class = 1; //No need to check again!
+          }
+          else{
+            level1.apply();
             if (meta.class == CLASS_NOT_SET) {
-              level3.apply();
+              level2.apply();
               if (meta.class == CLASS_NOT_SET) {
-                level4.apply();
+                level3.apply();
                 if (meta.class == CLASS_NOT_SET) {
-                  level5.apply();
+                  level4.apply();
+                  if (meta.class == CLASS_NOT_SET) {
+                    level5.apply();
+                  }
                 }
               }
             }
           }
+          if (meta.class != SEND_TO_ORACLE){ // if the class is set
+            if (meta.malware == 1) {// meta.malware is calculated with priori knowledge for statistics
+              if(meta.class == 1) {
+                reg_marked_malware.write((bit<32>)meta.register_index,1);
+              }
+            }
+            else {
+              if(meta.class == 1) {
+                reg_marked_malware.write((bit<32>)meta.register_index,1);
+              }
+            }
+          }
         }//hash collision check
+
+        if (meta.class == CLASS_NOT_SET){
+          meta.class = SEND_TO_ORACLE;
+        }
 
         if (meta.class == SEND_TO_ORACLE){
           send_to_oracle();
@@ -833,6 +912,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
     packet.emit(hdr.ipv4);
     packet.emit(hdr.tcp);
     packet.emit(hdr.udp);
+    packet.emit(hdr.packet_out_hdr);
   }
 }
 

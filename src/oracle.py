@@ -47,7 +47,8 @@ def send_packet_out(original_pkt, flow_hash, predicted_label, malware, is_first)
 
     payload = bytes(original_pkt)
 
-    out_pkt = Ether(src=original_pkt[Ether].src, dst=original_pkt[Ether].dst) / Raw(load=payload + pkt_out_header)
+    out_pkt = Raw(load=pkt_out_header + payload)
+
 
     sendp(out_pkt, iface="vf0_0", verbose=False)
 
