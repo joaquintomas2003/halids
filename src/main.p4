@@ -793,21 +793,17 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           }
         }//hash collision check
 
-        if (meta.class == CLASS_NOT_SET){
-          meta.class = SEND_TO_ORACLE;
-        }
-
         if (meta.class == SEND_TO_ORACLE){
           send_to_oracle();
           counter_.count(3); // Send to oracle count
         }else if(meta.class == 0) {
           standard_metadata.egress_spec = 771;
           hdr.ipv4.ecn = 0;
-          counter_.count(4); // Malware
+          counter_.count(4); // Not Malware
         } else if (meta.class == 1){
           standard_metadata.egress_spec = 770;
           hdr.ipv4.ecn = 1;
-          counter_.count(5); // Not Malware
+          counter_.count(5); // Malware
         };
       }
     }
