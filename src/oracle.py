@@ -1,4 +1,4 @@
-from scapy.all import sniff, Raw
+from scapy.all import sniff, Raw, sendp, Raw, Ether
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -16,8 +16,41 @@ from train_sw import TrainSwitch
 
 csv_file_name_for_retrain = "ml_data/predicted_labels_oracle.csv"
 
-def get_u64(payload, offset):
-    return int.from_bytes(payload[offset:offset+8], byteorder="big")
+def get_u64(payload, offset, length=8):
+    return int.from_bytes(payload[offset:offset+length], byteorder="big")
+
+def build_packet_out_header(packet_type, opcode, flow_hash, label, malware, is_first, reserved=0):
+    header = b''
+
+    header += int(packet_type).to_bytes(1, 'big')
+    header += int(opcode).to_bytes(1, 'big')
+    header += int(flow_hash).to_bytes(4, 'big')
+    header += int(label).to_bytes(2, 'big')
+    last_byte = ((malware & 0x1) << 7) | ((is_first & 0x1) << 6) | (reserved & 0x3F)
+    header += last_byte.to_bytes(1, 'big')
+
+    return header  # total: 9 bytes
+
+def send_packet_out(original_pkt, flow_hash, predicted_label, malware, is_first):
+    packet_type = 2
+    opcode = 2
+
+    pkt_out_header = build_packet_out_header(
+        packet_type=packet_type,
+        opcode=opcode,
+        flow_hash=flow_hash,
+        label=predicted_label,
+        malware=malware,
+        is_first=is_first,
+        reserved=0
+    )
+
+    payload = bytes(original_pkt)
+
+    out_pkt = Raw(load=pkt_out_header + payload)
+
+
+    sendp(out_pkt, iface="vf0_0", verbose=False)
 
 class Oracle():
     CPU_PORT = 510
@@ -132,18 +165,22 @@ class Oracle():
 
         payload = pkt[Raw].load
 
-        if len(payload) < 136:
+        if len(payload) < 135:
             print(f"Payload too short ({len(payload)} bytes). Expected 136.")
             return
 
-        # TODO: Mandarlos de p4 y contrastar los valores con un print
-        dur_value = get_u64(payload, 96)
-        sbytes_value = get_u64(payload, 104)
-        dpkts_value = get_u64(payload, 112)
-        spkts_value = get_u64(payload, 120)
+        packet_type = get_u64(payload, 0, 1)
+        opcode = get_u64(payload, 1, 1)
+        flow_hash = get_u64(payload, 2, 4)
+
+        base = 6 # 6 bytes from packet_type, opcode and flow_hash
+        dur_value = get_u64(payload, base + 96)
+        sbytes_value = get_u64(payload, base + 104)
+        dpkts_value = get_u64(payload, base + 112)
+        spkts_value = get_u64(payload, base + 120)
 
         # Boolean flags (malware and is_first) packed in last byte
-        flag_byte = payload[135]
+        flag_byte = payload[base + 135]
         malware = (flag_byte >> 7) & 0x1  # first bit
         is_first = (flag_byte >> 6) & 0x1  # second bit
 
@@ -152,7 +189,7 @@ class Oracle():
         max_int = sys.maxsize
 
         for i in range(12):
-            offset = i * 8
+            offset = base + i * 8
             orig_value = get_u64(payload, offset)
             retrain_value = orig_value
 
@@ -197,6 +234,8 @@ class Oracle():
 
         prediction = self.rf.predict([features_fit])[0]
         print(f"Predicted label: {prediction}, Malware: {malware}, First: {is_first}")
+
+        send_packet_out(pkt, flow_hash, int(prediction), malware, is_first)
 
         with open('ml_data/predicted_labels_oracle.csv', 'a') as f:
             writer = csv.writer(f)
