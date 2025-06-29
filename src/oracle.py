@@ -47,9 +47,12 @@ def send_packet_out(original_pkt, flow_hash, predicted_label, malware, is_first)
 
     payload = bytes(original_pkt)
 
-    out_pkt = Raw(load=pkt_out_header + payload)
+    final_payload = pkt_out_header + payload
+    if len(final_payload) > 1500:
+            print(f"[!] Packet size {len(final_payload)} exceeds MTU 1500. Packet not sent.")
+            return
 
-
+    out_pkt = Raw(load=final_payload)
     sendp(out_pkt, iface="vf0_0", verbose=False)
 
 class Oracle():
