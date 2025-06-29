@@ -265,7 +265,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<1>>(MAX_REGISTER_ENTRIES) reg_marked_malware;
 
 
-  counter(8, CounterType.packets) counter_;
+  counter(6, CounterType.packets) counter_;
 
   action init_register() {
     reg_dbytes.write(meta.register_index, 0);
@@ -606,23 +606,14 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         meta.class = 1;
       }
 
-      if (meta.malware == 1) {// meta.malware is calculated with priori knowledge for statistics
-        if(meta.class == 1) { // true positive - class=1 malware=1
-          reg_marked_malware.write((bit<32>)meta.register_index,1);
-        }
-      }
-      else { // malware == 0
-        if(meta.class == 1) { // false positive - class=1 malware=0
-          reg_marked_malware.write((bit<32>)meta.register_index,1);
-        }
+      if(meta.class == 1) { // true positive - class=1 malware=1
+        reg_marked_malware.write((bit<32>)meta.register_index,1);
       }
 
       if(meta.class == 0) {
         standard_metadata.egress_spec = 771;
-        hdr.ipv4.ecn = 0;
       } else if (meta.class == 1){
         standard_metadata.egress_spec = 770;
-        hdr.ipv4.ecn = 1;
       }
     }
 
@@ -796,15 +787,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             }
           }
           if (meta.class != SEND_TO_ORACLE){ // if the class is set
-            if (meta.malware == 1) {// meta.malware is calculated with priori knowledge for statistics
-              if(meta.class == 1) {
-                reg_marked_malware.write((bit<32>)meta.register_index,1);
-              }
-            }
-            else {
-              if(meta.class == 1) {
-                reg_marked_malware.write((bit<32>)meta.register_index,1);
-              }
+            if(meta.class == 1) {
+              reg_marked_malware.write((bit<32>)meta.register_index,1);
             }
           }
         }//hash collision check
@@ -824,11 +808,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
           standard_metadata.egress_spec = 770;
           hdr.ipv4.ecn = 1;
           counter_.count(5); // Not Malware
-        } else {
-          counter_.count(6); // Not assigned
         };
-      } else {
-        counter_.count(7);
       }
     }
   }
