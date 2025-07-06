@@ -2,6 +2,7 @@
 
 # inspired from https://github.com/ksingh25/SwitchTree
 
+import random
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -101,13 +102,12 @@ class TrainSwitch():
         #     tree.plot_tree(tree_in_forest,class_names=True, fontsize=8)
         #     plt.show()
 
-        # save the training data from the switch for retraining (for adding data, replacing it, etc.)
-        # comment to only use new generated data when retraining
+        data_for_retrain = np.column_stack((self.data_train, self.train_labels))
         with open(csv_file_name_for_retrain, "a") as save_labels_for_retrain:
             writer = csv.writer(save_labels_for_retrain)
-            data_for_retrain = np.column_stack((self.data_train, self.train_labels))
-            for x in data_for_retrain:
-                writer.writerow(x)
+            for row in data_for_retrain:
+                if random.random() < 0.2:  # 20% chance
+                    writer.writerow(row)
 
 
         # generate files with the trained RF
