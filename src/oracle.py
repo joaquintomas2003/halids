@@ -70,6 +70,8 @@ class Oracle():
         #############################################
         ############# TRAIN THE ORACLE ##############
         #############################################
+        self.predicted_0_count = 0
+        self.predicted_1_count = 0
 
         data_train = pd.read_csv('ml_data/datos_limpios.csv')
         data_train.shape
@@ -236,7 +238,14 @@ class Oracle():
             features_train[i] = retrain_value
 
         prediction = self.rf.predict([features_fit])[0]
+
+        if prediction == 1:
+            self.predicted_1_count += 1
+        elif prediction == 0:
+            self.predicted_0_count += 1
+
         print(f"Predicted label: {prediction}, Malware: {malware}, First: {is_first}")
+        print(f"Total predicted 0s: {self.predicted_0_count}, 1s: {self.predicted_1_count}")
 
         send_packet_out(pkt, flow_hash, int(prediction), malware, is_first)
 
