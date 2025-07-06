@@ -93,7 +93,7 @@ class TrainSwitch():
 
         # train the ML model
         # bootstrap = False to let the samples values be the real ones
-        self.rf = RandomForestClassifier(n_estimators = 1, n_jobs=1, random_state=0, max_depth=4, bootstrap=False)
+        self.rf = RandomForestClassifier(n_estimators = 1, n_jobs=1, random_state=0, max_depth=2, bootstrap=False)
 
         self.rf.fit(self.data_train, self.train_labels)
         # for tree_in_forest in self.rf.estimators_:
@@ -173,7 +173,7 @@ class TrainSwitch():
 
         # train the ML model
         # bootstrap = False to let the samples values be the real ones
-        self.rf = RandomForestClassifier(n_estimators = 1, n_jobs=1, random_state=0, max_depth=4, bootstrap=False)
+        self.rf = RandomForestClassifier(n_estimators = 1, n_jobs=1, random_state=0, max_depth=2, bootstrap=False)
 
         self.rf.fit(self.data_train, self.train_labels)
 
