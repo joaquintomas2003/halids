@@ -14,7 +14,7 @@ const bit<16> TYPE_IPV4 = 0x800;
 #define STATE_CLO 6
 #define STATE_EST 7
 
-#define THRESHOLD_CERTAINTY 100
+#define THRESHOLD_CERTAINTY 0
 #define SEND_TO_ORACLE 2
 
 #define CPU_PORT 768
