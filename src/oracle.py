@@ -1,4 +1,4 @@
-from scapy.all import sniff, Raw, sendp, Raw, Ether
+from scapy.all import sniff, Raw, sendp, Raw, Ether, TCP
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -164,18 +164,30 @@ class Oracle():
         Oracle.received_packets += 1
         print(f"Received packet #{Oracle.received_packets}")
 
-        if Raw not in pkt:
+        if TCP not in pkt:
+            print("Non-TCP packet received, skipping.")
+            return
+
+        payload = bytes(pkt[TCP].payload)
+
+        if not payload:
             print("No payload found.")
             return
 
-        payload = pkt[Raw].load
+        payload_base = 0
+        if len(payload) == 144:
+            payload_base = 9
+            payload = payload[payload_base:]
 
-        if len(payload) < 135:
+        if len(payload) < payload_base + 135:
             print(f"Payload too short ({len(payload)} bytes). Expected 136.")
             return
 
+        print(f"length {len(payload)}")
         packet_type = get_u64(payload, 0, 1)
+        print(f"Packet type: {packet_type}")
         opcode = get_u64(payload, 1, 1)
+        print(f"Opcode: {opcode}")
         flow_hash = get_u64(payload, 2, 4)
 
         base = 6 # 6 bytes from packet_type, opcode and flow_hash
@@ -185,7 +197,7 @@ class Oracle():
         spkts_value = get_u64(payload, base + 120)
 
         # Boolean flags (malware and is_first) packed in last byte
-        flag_byte = payload[base + 135]
+        flag_byte = payload[base + 128]
         malware = (flag_byte >> 7) & 0x1  # first bit
         is_first = (flag_byte >> 6) & 0x1  # second bit
 
