@@ -279,7 +279,7 @@ class Oracle():
             writer.writerow(features_train + [prediction])
 
         # Retrain
-        packets_retrain = 100
+        packets_retrain = 2000
         if Oracle.received_packets > packets_retrain:
             Oracle.cant_retrain += 1
             self.train_sw.retrain()
