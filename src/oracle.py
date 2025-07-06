@@ -1,4 +1,4 @@
-from scapy.all import sniff, Raw, sendp, Raw, Ether, TCP
+from scapy.all import sniff, Raw, sendp, Raw, Ether, TCP, IP
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -168,11 +168,24 @@ class Oracle():
             print("Non-TCP packet received, skipping.")
             return
 
-        payload = bytes(pkt[TCP].payload)
+        # Get full packet bytes
+        pkt_bytes = bytes(pkt)
 
-        if not payload:
-            print("No payload found.")
+        # IP header length in bytes
+        ip_header_len = pkt[IP].ihl * 4
+
+        tcp_header_len = 20
+
+        l2_offset = 14  # Ethernet header size (standard)
+        tcp_payload_offset = l2_offset + ip_header_len + tcp_header_len
+
+        if len(pkt_bytes) <= tcp_payload_offset:
+            print("No TCP payload present.")
             return
+
+        # Get TCP payload manually, skipping Scapy’s interpretation
+        payload = pkt_bytes[tcp_payload_offset:]
+        print(f"Manually extracted TCP payload ({len(payload)} bytes).")
 
         payload_base = 0
         if len(payload) == 144:
