@@ -1,4 +1,4 @@
-from scapy.all import sniff, Raw, sendp, Raw, Ether
+from scapy.all import sniff, Raw, sendp, Raw, Ether, TCP, IP
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -70,6 +70,8 @@ class Oracle():
         #############################################
         ############# TRAIN THE ORACLE ##############
         #############################################
+        self.predicted_0_count = 0
+        self.predicted_1_count = 0
 
         data_train = pd.read_csv('ml_data/datos_limpios.csv')
         data_train.shape
@@ -162,18 +164,43 @@ class Oracle():
         Oracle.received_packets += 1
         print(f"Received packet #{Oracle.received_packets}")
 
-        if Raw not in pkt:
-            print("No payload found.")
+        if TCP not in pkt:
+            print("Non-TCP packet received, skipping.")
             return
 
-        payload = pkt[Raw].load
+        # Get full packet bytes
+        pkt_bytes = bytes(pkt)
 
-        if len(payload) < 135:
+        # IP header length in bytes
+        ip_header_len = pkt[IP].ihl * 4
+
+        tcp_header_len = 20
+
+        l2_offset = 14  # Ethernet header size (standard)
+        tcp_payload_offset = l2_offset + ip_header_len + tcp_header_len
+
+        if len(pkt_bytes) <= tcp_payload_offset:
+            print("No TCP payload present.")
+            return
+
+        # Get TCP payload manually, skipping Scapy’s interpretation
+        payload = pkt_bytes[tcp_payload_offset:]
+        print(f"Manually extracted TCP payload ({len(payload)} bytes).")
+
+        payload_base = 0
+        if len(payload) == 144:
+            payload_base = 9
+            payload = payload[payload_base:]
+
+        if len(payload) < payload_base + 135:
             print(f"Payload too short ({len(payload)} bytes). Expected 136.")
             return
 
+        print(f"length {len(payload)}")
         packet_type = get_u64(payload, 0, 1)
+        print(f"Packet type: {packet_type}")
         opcode = get_u64(payload, 1, 1)
+        print(f"Opcode: {opcode}")
         flow_hash = get_u64(payload, 2, 4)
 
         base = 6 # 6 bytes from packet_type, opcode and flow_hash
@@ -183,7 +210,7 @@ class Oracle():
         spkts_value = get_u64(payload, base + 120)
 
         # Boolean flags (malware and is_first) packed in last byte
-        flag_byte = payload[base + 135]
+        flag_byte = payload[base + 128]
         malware = (flag_byte >> 7) & 0x1  # first bit
         is_first = (flag_byte >> 6) & 0x1  # second bit
 
@@ -236,7 +263,14 @@ class Oracle():
             features_train[i] = retrain_value
 
         prediction = self.rf.predict([features_fit])[0]
+
+        if prediction == 1:
+            self.predicted_1_count += 1
+        elif prediction == 0:
+            self.predicted_0_count += 1
+
         print(f"Predicted label: {prediction}, Malware: {malware}, First: {is_first}")
+        print(f"Total predicted 0s: {self.predicted_0_count}, 1s: {self.predicted_1_count}")
 
         send_packet_out(pkt, flow_hash, int(prediction), malware, is_first)
 
