@@ -140,7 +140,7 @@ class Oracle():
         # ML model
         # bootstrap = False to let the samples values be the real ones
         # n_estimators: number of DT in RF
-        self.rf = RandomForestClassifier(n_estimators = 100, n_jobs=1, random_state=0, max_depth=14, bootstrap=False)
+        self.rf = RandomForestClassifier(n_estimators = 100, n_jobs=1, random_state=0, max_depth=4, bootstrap=False)
 
         self.rf.fit(data_train, train_labels)
         # for tree_in_forest in self.rf.estimators_:
