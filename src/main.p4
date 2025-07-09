@@ -265,7 +265,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   register<bit<1>>(MAX_REGISTER_ENTRIES) reg_marked_malware;
 
 
-  counter(6, CounterType.packets) counter_;
+  counter(7, CounterType.packets) counter_;
 
   action init_register() {
     reg_dbytes.write(meta.register_index, 0);
@@ -584,6 +584,11 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
   }
 
   apply {
+    if (standard_metadata.packet_length > 1000 ) {
+      counter_.count(6);
+      mark_to_drop();
+    }
+
     meta.direction = 0;
 
     direction.apply();
